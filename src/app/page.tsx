@@ -27,6 +27,7 @@ export default function EnterpriseVanBookingSystem() {
   const [loading, setLoading] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [activeMenu, setActiveMenu] = useState<'home' | 'booking' | 'history' | 'qrcode' | 'admin'>('home');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // 🔥 เพิ่ม State สำหรับเปิด-ปิดเมนูบนมือถือ
 
   // ตรวจสอบสิทธิ์ว่าเป็นแอดมินหรือไม่ (สามารถเปลี่ยนเมลแอดมินตรงนี้ได้ครับ)
   const isAdmin = user?.email === 'admin@company.com';
@@ -132,7 +133,7 @@ export default function EnterpriseVanBookingSystem() {
   }
 
   return (
-    <div className={`min-h-screen flex ${theme.bg} antialiased`}>
+    <div className={`min-h-screen flex ${theme.bg} antialiased relative`}>
       {/* GLOBAL MODAL DIALOG */}
       {modalAlert.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm text-xs">
@@ -147,21 +148,31 @@ export default function EnterpriseVanBookingSystem() {
         </div>
       )}
 
+      {/* MOBILE BACKDROP */}
+      {isMobileMenuOpen && (
+        <div 
+          className="fixed inset-0 z-40 bg-slate-950/50 md:hidden backdrop-blur-xs"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
+
       {/* SIDEBAR NAVIGATION */}
-      <aside className={`w-64 ${theme.sidebar} border-r flex flex-col justify-between print:hidden`}>
+      <aside className={`w-64 ${theme.sidebar} border-r flex flex-col justify-between print:hidden fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 md:translate-x-0 md:static ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div>
-          <div className="p-6 border-b"><h1 className="font-black text-xs text-slate-900 dark:text-white">AEROFLEX CO., LTD.</h1></div>
+          <div className="p-6 border-b flex justify-between items-center">
+            <h1 className="font-black text-xs text-slate-900 dark:text-white">AEROFLEX CO., LTD.</h1>
+            <button onClick={() => setIsMobileMenuOpen(false)} className="md:hidden text-slate-500 font-bold p-1">✕</button>
+          </div>
           <nav className="mt-4 space-y-1 text-xs">
-            <button onClick={() => setActiveMenu('home')} className={`w-full text-left px-6 py-3 ${activeMenu === 'home' ? theme.menuActive : theme.menuInactive}`}>หน้าหลัก & ประกาศ</button>
-            <button onClick={() => setActiveMenu('booking')} className={`w-full text-left px-6 py-3 ${activeMenu === 'booking' ? theme.menuActive : theme.menuInactive}`}>ลงทะเบียนจองคิวรถตู้</button>
-            <button onClick={() => setActiveMenu('history')} className={`w-full text-left px-6 py-3 ${activeMenu === 'history' ? theme.menuActive : theme.menuInactive}`}>ประวัติการเดินทาง</button>
-            <button onClick={() => setActiveMenu('qrcode')} className={`w-full text-left px-6 py-3 ${activeMenu === 'qrcode' ? theme.menuActive : theme.menuInactive}`}>คิวอาร์โค้ดเช็กอิน</button>
+            <button onClick={() => { setActiveMenu('home'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-6 py-3 ${activeMenu === 'home' ? theme.menuActive : theme.menuInactive}`}>หน้าหลัก & ประกาศ</button>
+            <button onClick={() => { setActiveMenu('booking'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-6 py-3 ${activeMenu === 'booking' ? theme.menuActive : theme.menuInactive}`}>ลงทะเบียนจองคิวรถตู้</button>
+            <button onClick={() => { setActiveMenu('history'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-6 py-3 ${activeMenu === 'history' ? theme.menuActive : theme.menuInactive}`}>ประวัติการเดินทาง</button>
+            <button onClick={() => { setActiveMenu('qrcode'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-6 py-3 ${activeMenu === 'qrcode' ? theme.menuActive : theme.menuInactive}`}>คิวอาร์โค้ดเช็กอิน</button>
             
-            {/* ซ่อนเมนู ADMIN DESK ถ้าไม่ใช่อีเมลแอดมิน */}
             {isAdmin && (
               <div className="pt-4 mt-4 border-t mx-4">
                 <span className="px-2 text-[10px] uppercase font-bold text-slate-400 block mb-1">ADMIN DESK</span>
-                <button onClick={() => setActiveMenu('admin')} className={`w-full text-left px-4 py-2.5 rounded-xl ${activeMenu === 'admin' ? 'bg-slate-900 text-white font-bold' : theme.menuInactive}`}>แผงควบคุมแอดมิน</button>
+                <button onClick={() => { setActiveMenu('admin'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-4 py-2.5 rounded-xl ${activeMenu === 'admin' ? 'bg-slate-900 text-white font-bold' : theme.menuInactive}`}>แผงควบคุมแอดมิน</button>
               </div>
             )}
           </nav>
@@ -173,14 +184,18 @@ export default function EnterpriseVanBookingSystem() {
       </aside>
 
       {/* RENDER DYNAMIC VIEWS */}
-      <div className="flex-1 flex flex-col">
-        <header className={`h-16 px-8 border-b ${theme.card} flex justify-between items-center print:hidden`}>
-          <div className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">ระบบจองรถตู้พนักงานบริษัท แอร์โรเฟลกซ์ จำกัด</div>
-          <div className="text-xs font-bold">{user.email}</div>
+      <div className="flex-1 flex flex-col min-w-0">
+        <header className={`h-16 px-4 md:px-8 border-b ${theme.card} flex justify-between items-center print:hidden`}>
+          <div className="flex items-center gap-3 min-w-0">
+            <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-bold shrink-0">
+              ☰ เมนู
+            </button>
+            <div className="text-[11px] md:text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white truncate">ระบบจองรถตู้พนักงานบริษัท แอร์โรเฟลกซ์ จำกัด</div>
+          </div>
+          <div className="text-[10px] md:text-xs font-bold truncate ml-2 shrink-0">{user.email}</div>
         </header>
 
-        <main className="flex-1 p-8 overflow-y-auto">
-          {/* ป้องกันการเรนเดอร์หน้า Admin ถ้าไม่ใช่แอดมินตัวจริง */}
+        <main className="flex-1 p-4 md:p-8 overflow-y-auto">
           {activeMenu === 'admin' && isAdmin ? (
             <AdminView      
               db={db} user={user} theme={theme} showAlert={showAlert}
@@ -192,7 +207,7 @@ export default function EnterpriseVanBookingSystem() {
               db={db} user={user} theme={theme} activeMenu={activeMenu} setActiveMenu={setActiveMenu}
               routesList={routesList} bookingsList={bookingsList} announcementsList={announcementsList}
               recentBooking={recentBooking} setRecentBooking={setRecentBooking} showAlert={showAlert}
-              supportTicketsList={ticketsList} // 🔥 ใส่ข้อมูลชุดนี้เพิ่มเข้าไปให้เรียบร้อยแล้วครับ
+              supportTicketsList={ticketsList}
             />
           )}
         </main>
