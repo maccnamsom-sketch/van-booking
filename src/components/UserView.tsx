@@ -1,12 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { collection, addDoc, doc, updateDoc, arrayUnion, deleteDoc } from 'firebase/firestore';
-
-interface StationTime {
-  stationName: string;
-  arrivalTime: string;
-}
+import { collection, addDoc, doc, updateDoc, arrayUnion } from 'firebase/firestore';
 
 interface UserViewProps {
   db: any;
@@ -27,29 +22,16 @@ export default function UserView({ db, user, theme, activeMenu, setActiveMenu, r
   const [bookingStep, setBookingStep] = useState<1 | 2 | 3>(1);
   const [isBookingLoading, setIsBookingLoading] = useState(false);
 
-  // States สำหรับระบบแจ้งปัญหาแบบ Chat
   const [ticketSubject, setTicketSubject] = useState('');
   const [ticketFirstMessage, setTicketFirstMessage] = useState('');
   const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
   const [replyMessages, setReplyMessages] = useState<{ [ticketId: string]: string }>({}); 
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   
-  // State สำหรับเปิด-ปิดหน้าต่างแชทของตั๋วที่เลือก
-  const [activeChatTicketId, setActiveChatTicketId] = useState<string | null>(null);
-
-  // States สำหรับขอยกเลิกตั๋ว
-  const [cancelingTicketId, setCancelingTicketId] = useState<string | null>(null);
-  const [cancelReason, setCancelReason] = useState('');
-
-  // User Reservation States
-  const [employeeName, setEmployeeName] = useState('');
-  const [employeePhone, setEmployeePhone] = useState('');
-  const [selectedRouteId, setSelectedRouteId] = useState(routesList[0]?.id || '');
-  const [selectedRouteName, setSelectedRouteName] = useState(routesList[0]?.name || '');
-  const [selectedRouteMaxSeats, setSelectedRouteMaxSeats] = useState(routesList[0]?.totalSeats || 14);
-  const [selectedStationIndex, setSelectedStationIndex] = useState<number>(0);
-  const [travelDate, setTravelDate] = useState('');
-
+  // State สำหรับกรองประวัติการจอง
+  const [historyFilterDate, setHistoryFilterDate] = useState('');
+  const [historyFilterRoute, setHistoryFilterRoute] = useState('');
+  
   const getTodayDateString = () => {
     const today = new Date();
     const yyyy = today.getFullYear();
@@ -58,16 +40,70 @@ export default function UserView({ db, user, theme, activeMenu, setActiveMenu, r
     return `${yyyy}-${mm}-${dd}`;
   };
 
+  const [selectedSummaryDate, setSelectedSummaryDate] = useState(getTodayDateString());
+  const [activeChatTicketId, setActiveChatTicketId] = useState<string | null>(null);
+
+  const [cancelingTicketId, setCancelingTicketId] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+
+  const [employeeName, setEmployeeName] = useState('');
+  const [employeePhone, setEmployeePhone] = useState('');
+  const [selectedRouteId, setSelectedRouteId] = useState(routesList[0]?.id || '');
+  const [selectedRouteName, setSelectedRouteName] = useState(routesList[0]?.name || '');
+  const [selectedRouteMaxSeats, setSelectedRouteMaxSeats] = useState(routesList[0]?.totalSeats || 14);
+  const [selectedStationIndex, setSelectedStationIndex] = useState<number>(0);
+  const [travelDate, setTravelDate] = useState('');
+
+  const [selectedShift, setSelectedShift] = useState<'กะเช้า' | 'กะดึก'>('กะเช้า');
+
   const todayStr = getTodayDateString();
-  const todayBookings = bookingsList.filter(b => b.travelDate === todayStr);
+  const summaryBookings = bookingsList.filter(b => b.travelDate === selectedSummaryDate);
+  const myBookings = bookingsList.filter(b => b.employeeEmail === (user?.email || 'employee@company.com'));
+
+  // กรองประวัติการจองตามเงื่อนไขที่เลือก
+  const filteredHistory = myBookings.filter((b: any) => {
+    const matchDate = historyFilterDate ? b.travelDate === historyFilterDate : true;
+    const matchRoute = historyFilterRoute ? b.route === historyFilterRoute : true;
+    return matchDate && matchRoute;
+  });
+
+  const formatThaiDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    const yyyy = parseInt(parts[0], 10) + 543;
+    const mm = parts[1];
+    const dd = parts[2];
+    return `${dd}/${mm}/${yyyy}`;
+  };
 
   const getBookedSeatsCount = (routeName: string, date: string) => {
     return bookingsList.filter(b => b.route === routeName && b.travelDate === date).length;
   };
 
   const currentActiveRoute = routesList.find(r => r.id === selectedRouteId) || routesList[0];
-  const currentTotalBooked = travelDate ? getBookedSeatsCount(selectedRouteName, travelDate) : 0;
-  const currentAvailableSeats = selectedRouteMaxSeats - currentTotalBooked;
+  const getRouteStations = (route: any) => {
+    if (!route) return [];
+    return route.stops || route.stations || [];
+  };
+
+  const checkCutoffTimeAndAdjustDate = (inputDate: string) => {
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const currentTimeInMinutes = currentHour * 60 + currentMinute;
+    const cutoffTimeInMinutes = 15 * 60;
+
+    if (inputDate === getTodayDateString() && currentTimeInMinutes >= cutoffTimeInMinutes) {
+      const tomorrow = new Date();
+      tomorrow.setDate(now.getDate() + 1);
+      const yyyy = tomorrow.getFullYear();
+      const mm = String(tomorrow.getMonth() + 1).padStart(2, '0');
+      const dd = String(tomorrow.getDate()).padStart(2, '0');
+      return { adjustedDate: `${yyyy}-${mm}-${dd}`, isAdjusted: true };
+    }
+    return { adjustedDate: inputDate, isAdjusted: false };
+  };
 
   const handleSendTicket = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,13 +119,7 @@ export default function UserView({ db, user, theme, activeMenu, setActiveMenu, r
         subject: ticketSubject,
         status: 'Pending',
         timestamp: new Date().toISOString(),
-        messages: [
-          {
-            sender: 'user',
-            text: ticketFirstMessage,
-            timestamp: new Date().toISOString()
-          }
-        ]
+        messages: [{ sender: 'user', text: ticketFirstMessage, timestamp: new Date().toISOString() }]
       });
 
       showAlert('success', 'เปิดฟอร์มแจ้งเรื่องเรียบร้อย', 'คุณสามารถแตะเพื่อคุยรายละเอียดเพิ่มเติมได้ทันที');
@@ -111,11 +141,7 @@ export default function UserView({ db, user, theme, activeMenu, setActiveMenu, r
       const ticketRef = doc(db, 'support_tickets', ticketId);
       await updateDoc(ticketRef, {
         status: 'Pending', 
-        messages: arrayUnion({
-          sender: 'user',
-          text: textToReply,
-          timestamp: new Date().toISOString()
-        })
+        messages: arrayUnion({ sender: 'user', text: textToReply, timestamp: new Date().toISOString() })
       });
       setReplyMessages(prev => ({ ...prev, [ticketId]: '' }));
     } catch (error) {
@@ -134,11 +160,7 @@ export default function UserView({ db, user, theme, activeMenu, setActiveMenu, r
       await updateDoc(ticketRef, {
         status: 'CancelRequested',
         cancelReason: cancelReason.trim(),
-        messages: arrayUnion({
-          sender: 'user',
-          text: `[ขอยกเลิกเรื่องนี้] เหตุผล: ${cancelReason.trim()}`,
-          timestamp: new Date().toISOString()
-        })
+        messages: arrayUnion({ sender: 'user', text: `[ขอยกเลิกเรื่องนี้] เหตุผล: ${cancelReason.trim()}`, timestamp: new Date().toISOString() })
       });
       showAlert('success', 'ส่งคำขอยกเลิกแล้ว', 'ระบบได้ส่งเรื่องขอยกเลิกไปยังแอดมินเพื่อดำเนินการลบเรียบร้อย');
       setCancelingTicketId(null);
@@ -149,52 +171,9 @@ export default function UserView({ db, user, theme, activeMenu, setActiveMenu, r
     }
   };
 
-  const handleCreateBooking = async () => {
-    if (!currentActiveRoute || !travelDate || !employeeName || !employeePhone) {
-      showAlert('warning', 'ข้อมูลไม่ครบถ้วน', 'โปรดกรอกชื่อ เบอร์โทรศัพท์ และระบุวันเดินทางก่อนดำเนินการ');
-      return;
-    }
-
-    const targetStation = currentActiveRoute.stations[selectedStationIndex];
-    const currentEmployeeEmail = user?.email || 'employee@company.com';
-
-    const hasAlreadyBooked = bookingsList.some(b => 
-      b.employeeEmail === currentEmployeeEmail && b.route === selectedRouteName && b.travelDate === travelDate
-    );
-
-    if (hasAlreadyBooked) {
-      showAlert('warning', 'ลงทะเบียนซ้ำซ้อน', 'คุณมีรายการสำรองที่นั่งในเส้นทางนี้เรียบร้อยแล้ว');
-      return;
-    }
-
-    if (currentAvailableSeats <= 0) {
-      showAlert('error', 'สิทธิ์เต็มจำนวน', 'ขออภัย จำนวนที่นั่งในรอบการเดินทางนี้เต็มโควตาแล้ว');
-      return;
-    }
-
-    setIsBookingLoading(true);
-    try {
-      const bookingData = {
-        employeeEmail: currentEmployeeEmail, employeeName, employeePhone,
-        route: selectedRouteName, pickupLocation: targetStation.stationName, time: targetStation.arrivalTime,
-        driverName: currentActiveRoute.driverName || 'ไม่ระบุ', vanPlate: currentActiveRoute.vanPlate || 'ไม่ระบุ',
-        travelDate, seatsCount: 1, status: 'Confirmed', timestamp: new Date().toISOString()
-      };
-      
-      const docRef = await addDoc(collection(db, 'van_bookings'), bookingData);
-      setRecentBooking({ id: docRef.id, ...bookingData });
-      
-      showAlert('success', 'สำรองที่นั่งเสร็จสิ้น', 'ระบบลงทะเบียนชื่อและเบอร์โทรของคุณเรียบร้อย', () => {
-        setActiveMenu('qrcode');
-        setBookingStep(1);
-      });
-    } catch {
-      showAlert('error', 'เกิดข้อผิดพลาด', 'ระบบขัดข้องในการเชื่อมต่อฐานข้อมูล');
-    } finally { setIsBookingLoading(false); }
-  };
-
   const myTickets = supportTicketsList?.filter(t => t.employeeEmail === (user?.email || 'employee@company.com')) || [];
   const selectedTicket = myTickets.find(t => t.id === activeChatTicketId);
+  const activeStations = getRouteStations(currentActiveRoute);
 
   return (
     <div className="text-sm text-slate-800 dark:text-slate-100">
@@ -209,15 +188,14 @@ export default function UserView({ db, user, theme, activeMenu, setActiveMenu, r
                   onClick={() => setShowSummaryModal(true)}
                   className="bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold px-3 py-1 rounded-full transition-all shadow-md flex items-center gap-1 cursor-pointer"
                 >
-                  🔍 ตรวจสอบรายชื่อผู้เดินทางวันนี้ ({todayBookings.length} ท่าน)
+                  🔍 ตรวจสอบรายชื่อผู้เดินทางประจำวัน ({bookingsList.filter(b => b.travelDate === todayStr).length} ท่าน)
                 </button>
               </div>
               <h2 className="text-xl md:text-2xl font-bold tracking-tight mt-2 text-white">ระบบจองรถตู้พนักงานบริษัท แอร์โรเฟลกซ์ จำกัด</h2>
-              <p className="text-xs text-slate-100 font-medium leading-relaxed opacity-90">ระบบสารสนเทศสำหรับการตรวจสอบข้อมูลเดินรถ ตารางเวลาสถานีรับส่ง และลงทะเบียนเพื่อสำรองที่นั่งพนักงานส่วนกลางขององค์กร</p>
+              <p className="text-xs text-slate-100 font-medium leading-relaxed opacity-90">ระบบสารสนเทศสำหรับการตรวจสอบข้อมูลเดินรถ ตารางเวลาสถานีรับส่ง และลงทะเบียนเพื่อสำรองที่นั่งพนักงานส่วนกลางขององค์กร (ตัดรอบจองเวลา 15.00 น.)</p>
             </div>
           </div>
 
-          {/* ประกาศข่าวสาร */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
               <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">ประกาศสำคัญจากฝ่ายธุรการ</h3>
@@ -241,7 +219,6 @@ export default function UserView({ db, user, theme, activeMenu, setActiveMenu, r
             )}
           </div>
 
-          {/* ฟอร์มเปิดตั๋วแจ้งปัญหา */}
           <div className="space-y-4 pt-4">
             <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
               <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">HELP & SUPPORT (ติดต่อ/แจ้งปัญหาถึงแอดมิน)</h3>
@@ -281,7 +258,6 @@ export default function UserView({ db, user, theme, activeMenu, setActiveMenu, r
               </div>
             </form>
 
-            {/* รายการตั๋วแบบการ์ดกระชับ พร้อมปุ่ม "แตะเพื่อคุย" และ "ขอยกเลิก" */}
             <div className="space-y-3 mt-6">
               <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">📋 รายการเรื่องที่คุณเคยแจ้งไว้</h4>
               <div className="grid grid-cols-1 gap-3">
@@ -299,7 +275,7 @@ export default function UserView({ db, user, theme, activeMenu, setActiveMenu, r
                           }`}>
                             {ticket.status === 'Pending' ? '🔴 รอดำเนินการ' : 
                              ticket.status === 'Processing' ? '🟡 กำลังตรวจสอบ' : 
-                             ticket.status === 'CancelRequested' ? '⚠️ รอยกเลิกคำร้อง' : '🟢 แก้ไขเรียบร้อย'}
+                             ticket.status === 'CancelRequested' ? '⚠️ รอยยกเลิกคำร้อง' : '🟢 แก้ไขเรียบร้อย'}
                           </span>
                         </div>
                         <p className="text-[11px] text-slate-400 font-mono">ID: {ticket.id}</p>
@@ -330,42 +306,185 @@ export default function UserView({ db, user, theme, activeMenu, setActiveMenu, r
                 )}
               </div>
             </div>
-
           </div>
         </div>
       )}
 
-      {/* Modal แสดงรายชื่อผู้เดินทางวันนี้ */}
-      {showSummaryModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4 text-xs">
-            <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3">
-              <h3 className="font-black text-sm flex items-center gap-2 text-slate-900 dark:text-white">
-                🟢 รายชื่อผู้เดินทางวันนี้ <span className="text-[11px] font-normal text-slate-400">({todayStr})</span>
-              </h3>
-              <button 
-                onClick={() => setShowSummaryModal(false)}
-                className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-white flex items-center justify-center font-bold text-xs cursor-pointer"
-              >
-                ✕
-              </button>
+      {/* HISTORY TAB (ประวัติการจอง) */}
+      {activeMenu === 'history' && (
+        <div className="max-w-3xl mx-auto space-y-6">
+          <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-2">
+            <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">ประวัติการจอง</h3>
+            <span className="text-[11px] text-slate-500">ทั้งหมด {myBookings.length} รายการ</span>
+          </div>
+
+          {/* แผงตัวกรองค้นหาประวัติ */}
+          <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+            <div>
+              <label className="block font-bold text-slate-500 mb-1">กรองตามวันที่เดินทาง</label>
+              <input 
+                type="date"
+                value={historyFilterDate}
+                onChange={(e) => setHistoryFilterDate(e.target.value)}
+                className="w-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-2 rounded-lg font-bold text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer"
+              />
             </div>
-            
-            <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
-              {todayBookings.length === 0 ? (
-                <div className="py-10 text-center text-slate-400">📭 ไม่มีรายชื่อพนักงานที่ลงทะเบียนเดินทางในวันนี้</div>
-              ) : (
-                todayBookings.map((b: any, idx: number) => (
-                  <div key={idx} className="p-3 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 flex justify-between items-center gap-3">
-                    <div>
-                      <p className="font-bold text-slate-900 dark:text-white">{b.employeeName}</p>
-                      <p className="text-[10px] text-slate-400">สาย: <span className="text-blue-600 font-semibold">{b.route}</span> | จุดรับ: {b.pickupLocation}</p>
+            <div>
+              <label className="block font-bold text-slate-500 mb-1">กรองตามสายรถ</label>
+              <select
+                value={historyFilterRoute}
+                onChange={(e) => setHistoryFilterRoute(e.target.value)}
+                className="w-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-2.5 rounded-lg font-bold text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer"
+              >
+                <option value="">-- ทุกสายรถ --</option>
+                {routesList.map((r: any) => (
+                  <option key={r.id} value={r.name}>{r.name}</option>
+                ))}
+              </select>
+            </div>
+            {(historyFilterDate || historyFilterRoute) && (
+              <div className="md:col-span-2 flex justify-end">
+                <button 
+                  onClick={() => { setHistoryFilterDate(''); setHistoryFilterRoute(''); }}
+                  className="text-rose-600 hover:text-rose-700 font-bold text-[11px] cursor-pointer"
+                >
+                  ล้างตัวกรองทั้งหมด ↺
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            {filteredHistory.length > 0 ? (
+              filteredHistory.map((b: any, idx: number) => (
+                <div key={idx} className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-900 dark:text-white text-sm">🚐 {b.route}</span>
+                      <span className="text-[10px] bg-purple-50 dark:bg-purple-950/50 text-purple-600 px-2 py-0.5 rounded font-bold">{b.shift || 'กะเช้า'}</span>
                     </div>
-                    <span className="font-mono font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-600 px-2 py-1 rounded-xl">
-                      {b.time} น.
+                    <p className="text-xs text-slate-500 dark:text-slate-400">จุดรับ: {b.pickupLocation} ({b.time} น.) | ทะเบียนรถ: {b.vanPlate}</p>
+                    <p className="text-[11px] text-slate-400 font-mono">วันที่เดินทาง: {formatThaiDate(b.travelDate)}</p>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 self-start md:self-auto">
+                    <button 
+                      onClick={() => {
+                        setRecentBooking(b);
+                        setActiveMenu('qrcode');
+                      }}
+                      className="bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 font-bold px-3 py-1.5 rounded-lg text-xs transition-all flex items-center gap-1 cursor-pointer"
+                    >
+                      📱 ดู QR Code
+                    </button>
+                    <span className="text-[10px] font-bold px-2.5 py-1.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900">
+                      ยืนยันแล้ว
                     </span>
                   </div>
-                ))
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-12 border border-dashed rounded-xl text-slate-400 dark:text-slate-500 dark:border-slate-800">
+                ไม่พบประวัติการจองตามเงื่อนไขที่เลือก
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* QRCODE TAB */}
+      {activeMenu === 'qrcode' && (
+        <div className="max-w-md mx-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl text-center space-y-4">
+          <div className="border-b border-slate-200 dark:border-slate-800 pb-3">
+            <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Check-in Pass</span>
+            <h3 className="font-bold text-sm mt-0.5">คิวอาร์โค้ดสำหรับเช็คอินขึ้นรถ</h3>
+          </div>
+          {recentBooking ? (
+            <div className="space-y-3">
+              <p className="text-xs text-slate-600 dark:text-slate-300">แสดงคิวอาร์โค้ดนี้ให้คนขับรถสแกนเมื่อถึงจุดรับ</p>
+              <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl inline-block">
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(recentBooking.id || 'NO_ID')}`} 
+                  alt="QR Code" 
+                  className="mx-auto rounded-lg shadow-sm"
+                />
+              </div>
+              <div className="text-xs text-slate-500 space-y-1">
+                <p><strong>พนักงาน:</strong> {recentBooking.employeeName}</p>
+                <p><strong>สายรถ:</strong> {recentBooking.route}</p>
+                <p><strong>วันที่:</strong> {recentBooking.travelDate}</p>
+              </div>
+            </div>
+          ) : (
+            <div className="py-12 text-slate-400 text-xs">
+              ยังไม่มีข้อมูลการจองล่าสุดสำหรับสร้างคิวอาร์โค้ด กรุณาทำรายการจองก่อนครับ
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Modal แสดงรายชื่อผู้เดินทาง */}
+      {showSummaryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4 text-xs flex flex-col max-h-[85vh]">
+            <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3">
+              <h3 className="font-black text-sm flex items-center gap-2 text-slate-900 dark:text-white">
+                🟢 รายชื่อพนักงานที่ขึ้นรถวันที่ <span className="text-blue-600 dark:text-blue-400 font-mono">{formatThaiDate(selectedSummaryDate)}</span>
+              </h3>
+              <div className="flex items-center gap-2">
+                <input 
+                  type="date"
+                  value={selectedSummaryDate}
+                  onChange={(e) => setSelectedSummaryDate(e.target.value)}
+                  className="border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-[11px] px-2.5 py-1 rounded-xl font-bold focus:outline-none focus:border-blue-500 cursor-pointer"
+                />
+                <button 
+                  onClick={() => setShowSummaryModal(false)}
+                  className="w-7 h-7 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-white flex items-center justify-center font-bold text-xs cursor-pointer"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              {summaryBookings.length === 0 ? (
+                <div className="py-12 text-center text-slate-400">📭 ไม่มีรายชื่อพนักงานที่ลงทะเบียนเดินทางในวันที่ {formatThaiDate(selectedSummaryDate)}</div>
+              ) : (
+                routesList.map((route: any) => {
+                  const routeBookings = summaryBookings.filter((b: any) => b.route === route.name);
+                  return (
+                    <div key={route.id} className="p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+                      <div className="flex justify-between items-center border-b border-slate-200/60 dark:border-slate-800/60 pb-2">
+                        <h4 className="font-extrabold text-blue-600 dark:text-blue-400 text-sm flex items-center gap-1.5">
+                          🚐 {route.name} <span className="text-[10px] text-slate-400 font-normal">({routeBookings.length} ท่าน)</span>
+                        </h4>
+                        <span className="text-[10px] text-slate-500 font-mono">ทะเบียน: {route.plate || route.vanPlate || 'ไม่ระบุ'}</span>
+                      </div>
+
+                      {routeBookings.length === 0 ? (
+                        <p className="text-[11px] text-slate-400 py-1 italic">ไม่มีผู้โดยสารในสายนี้วันนี้</p>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                          {routeBookings.map((b: any, idx: number) => (
+                            <div key={idx} className="p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800/80 flex justify-between items-center gap-2">
+                              <div>
+                                <p className="font-bold text-slate-900 dark:text-white flex items-center gap-1">
+                                  {b.employeeName} 
+                                  <span className="text-[9px] text-purple-600 bg-purple-50 dark:bg-purple-950/50 px-1 py-0.2 rounded">{b.shift || 'กะเช้า'}</span>
+                                </p>
+                                <p className="text-[10px] text-slate-400">จุดรับ: {b.pickupLocation}</p>
+                              </div>
+                              <span className="font-mono font-bold bg-blue-50 dark:bg-blue-950/40 text-blue-600 px-2 py-0.5 rounded-lg text-[11px] whitespace-nowrap">
+                                {b.time} น.
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
 
@@ -379,114 +498,14 @@ export default function UserView({ db, user, theme, activeMenu, setActiveMenu, r
         </div>
       )}
 
-      {/* Modal ยืนยันขอยกเลิกตั๋วพร้อมระบุเหตุผล */}
-      {cancelingTicketId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4">
-            <h3 className="font-bold text-sm text-slate-900 dark:text-white">❌ ระบุเหตุผลที่ต้องการยกเลิกคำร้องนี้</h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">กรุณากรอกรายละเอียดเหตุผลเพื่อให้แอดมินทราบก่อนส่งคำขอยกเลิกและลบเคส</p>
-            <textarea 
-              rows={3}
-              placeholder="เช่น แจ้งเรื่องผิดรอบ / ได้รับความช่วยเหลือแล้ว / อื่นๆ..."
-              value={cancelReason}
-              onChange={(e) => setCancelReason(e.target.value)}
-              className="w-full border border-slate-200 dark:border-slate-800 dark:bg-slate-950 p-2.5 rounded-xl text-xs focus:outline-none focus:border-rose-500"
-            />
-            <div className="flex gap-2 pt-2">
-              <button 
-                onClick={() => { setCancelingTicketId(null); setCancelReason(''); }}
-                className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 py-2 rounded-xl text-xs font-semibold cursor-pointer"
-              >
-                ย้อนกลับ
-              </button>
-              <button 
-                onClick={() => handleRequestCancelTicket(cancelingTicketId)}
-                className="flex-1 bg-rose-600 hover:bg-rose-700 text-white py-2 rounded-xl text-xs font-bold shadow cursor-pointer"
-              >
-                ยืนยันขอยกเลิก
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* หน้าต่าง Modal แชทเฉพาะกิจ (เด้งขึ้นมาเมื่อกดแตะเพื่อคุย) */}
-      {activeChatTicketId && selectedTicket && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col max-h-[85vh] overflow-hidden">
-            
-            {/* Header ของ Modal แชท */}
-            <div className="p-4 bg-slate-900 text-white flex justify-between items-center border-b border-slate-800">
-              <div>
-                <h3 className="font-bold text-sm">💬 แชท: {selectedTicket.subject}</h3>
-                <span className="text-[10px] text-slate-400 font-mono">ID: {selectedTicket.id}</span>
-              </div>
-              <button 
-                onClick={() => setActiveChatTicketId(null)}
-                className="bg-white/10 hover:bg-white/20 text-white rounded-lg p-1.5 text-xs font-bold transition-all cursor-pointer"
-              >
-                ✕ ปิดหน้าต่าง
-              </button>
-            </div>
-
-            {/* ส่วนกล่องข้อความแชทข้างใน */}
-            <div className="flex-1 p-4 bg-slate-50 dark:bg-slate-950 overflow-y-auto space-y-3 min-h-[300px] max-h-[45vh]">
-              {selectedTicket.messages && Array.isArray(selectedTicket.messages) ? (
-                selectedTicket.messages.map((msg: any, mIdx: number) => {
-                  const isMe = msg.sender === 'user';
-                  return (
-                    <div key={mIdx} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}>
-                      <span className="text-[9px] text-slate-400 mb-0.5 font-bold px-1">
-                        {isMe ? 'คุณ (พนักงาน)' : '💁‍♂️ แอดมิน/เจ้าหน้าที่'}
-                      </span>
-                      <div className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-xs font-medium shadow-sm ${
-                        isMe 
-                          ? 'bg-blue-600 text-white rounded-tr-none' 
-                          : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 rounded-tl-none border border-slate-200 dark:border-slate-700'
-                      }`}>
-                        <p className="whitespace-pre-wrap break-words">{msg.text}</p>
-                        <p className={`text-[8px] font-mono mt-1 text-right ${isMe ? 'text-blue-200' : 'text-slate-400'}`}>
-                          {msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'}) : ''}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="text-xs text-slate-400 text-center py-4">ไม่มีประวัติข้อความ</div>
-              )}
-            </div>
-
-            {/* ช่องพิมพ์ข้อความตอบกลับด้านล่างใน Modal */}
-            <div className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex gap-2">
-              <input 
-                type="text" 
-                placeholder="พิมพ์ข้อความตอบกลับแอดมินที่นี่..."
-                value={replyMessages[selectedTicket.id] || ''}
-                onChange={(e) => setReplyMessages(prev => ({ ...prev, [selectedTicket.id]: e.target.value }))}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleReplyTicket(selectedTicket.id); }}
-                className="w-full border border-slate-200 dark:border-slate-800 dark:bg-slate-950 p-2.5 rounded-xl text-xs focus:outline-none focus:border-blue-500"
-              />
-              <button 
-                type="button"
-                onClick={() => handleReplyTicket(selectedTicket.id)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-5 rounded-xl text-xs font-bold transition-all shadow whitespace-nowrap cursor-pointer"
-              >
-                ส่ง
-              </button>
-            </div>
-
-          </div>
-        </div>
-      )}
-
       {/* BOOKING TAB */}
       {activeMenu === 'booking' && (
         <div className="max-w-md mx-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-2xl text-slate-800 dark:text-white">
           <div className="bg-slate-950 text-white p-5 text-center border-b border-slate-800">
             <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Seat Reservation</span>
             <h3 className="text-sm font-bold uppercase tracking-wider mt-0.5">ระบบสำรองสิทธิ์เดินทาง</h3>
-            <div className="flex justify-center items-center gap-3 mt-4 text-[11px] font-bold">
+            <p className="text-[10px] text-amber-400 mt-1">⚠️ ตัดรอบจองเวลา 15:00 น. ของทุกวัน</p>
+            <div className="flex justify-center items-center gap-3 mt-3 text-[11px] font-bold">
               <span className={`h-6 w-6 rounded-full flex items-center justify-center border ${bookingStep === 1 ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-700 text-slate-400'}`}>1</span>
               <span className="w-6 h-[1px] bg-slate-800"></span>
               <span className={`h-6 w-6 rounded-full flex items-center justify-center border ${bookingStep === 2 ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-700 text-slate-400'}`}>2</span>
@@ -506,11 +525,11 @@ export default function UserView({ db, user, theme, activeMenu, setActiveMenu, r
                       setSelectedRouteMaxSeats(r.totalSeats || 14); setSelectedStationIndex(0);
                     }} className={`p-4 border rounded-xl cursor-pointer transition-all ${selectedRouteId === r.id ? 'border-blue-600 bg-blue-50/20 dark:bg-blue-950/20' : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}>
                       <p className="font-bold text-slate-900 dark:text-white text-sm">{r.name}</p>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">ยานพาหนะ: {r.vanPlate} · คนขับ: {r.driverName}</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">ยานพาหนะ: {r.plate || r.vanPlate} · คนขับ: {r.driver || r.driverName}</p>
                     </div>
                   ))}
                 </div>
-                <button onClick={() => setBookingStep(2)} className="w-full bg-slate-900 hover:bg-black dark:bg-slate-800 dark:hover:bg-slate-700 text-white font-semibold py-2.5 rounded-xl text-center mt-2 cursor-pointer">ขั้นตอนถัดไป (เลือกจุดขึ้นรถ) →</button>
+                <button onClick={() => setBookingStep(2)} className="w-full bg-slate-900 hover:bg-black dark:bg-slate-800 dark:hover:bg-slate-700 text-white font-semibold py-2.5 rounded-xl text-center mt-2 cursor-pointer">ขั้นตอนถัดไป (ข้อมูลผู้เดินทาง) →</button>
               </div>
             )}
 
@@ -529,55 +548,150 @@ export default function UserView({ db, user, theme, activeMenu, setActiveMenu, r
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-black uppercase text-slate-400 tracking-wider mb-1.5">สถานีจุดจอดรับและตารางเวลา</label>
-                  <select value={selectedStationIndex} onChange={(e) => setSelectedStationIndex(Number(e.target.value))} className="w-full border border-slate-200 dark:border-slate-800 dark:bg-slate-950 p-2.5 rounded-xl text-slate-900 dark:text-white font-semibold focus:outline-none focus:border-blue-500">
-                    {currentActiveRoute?.stations?.map((st: StationTime, i: number) => (
-                      <option key={i} value={i} className="dark:bg-slate-950">สถานี: {st.stationName} ({st.arrivalTime} น.)</option>
-                    )) || <option value="">ไม่มีข้อมูลสถานี</option>}
+                  <label className="block text-[11px] font-black uppercase text-slate-400 tracking-wider mb-1">เลือกกะการทำงาน</label>
+                  <select value={selectedShift} onChange={(e) => setSelectedShift(e.target.value as 'กะเช้า' | 'กะดึก')} className="w-full border border-slate-200 dark:border-slate-800 dark:bg-slate-950 p-2.5 rounded-xl text-slate-900 dark:text-white font-semibold focus:outline-none focus:border-blue-500 text-xs">
+                    <option value="กะเช้า">กะเช้า</option>
+                    <option value="กะดึก">กะดึก</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-black uppercase text-slate-400 tracking-wider mb-1.5">ระบุวันที่ต้องการเดินทาง</label>
-                  <input type="date" value={travelDate} onChange={(e) => setTravelDate(e.target.value)} className="w-full border border-slate-200 dark:border-slate-800 dark:bg-slate-950 p-2.5 rounded-xl text-slate-900 dark:text-white font-bold focus:outline-none focus:border-blue-500" />
+                  <label className="block text-[11px] font-black uppercase text-slate-400 tracking-wider mb-1.5">สถานีจุดจอดรับและตารางเวลา</label>
+                  <select value={selectedStationIndex} onChange={(e) => setSelectedStationIndex(Number(e.target.value))} className="w-full border border-slate-200 dark:border-slate-800 dark:bg-slate-950 p-2.5 rounded-xl text-slate-900 dark:text-white font-semibold focus:outline-none focus:border-blue-500">
+                    {activeStations.map((st: any, i: number) => (
+                      <option key={i} value={i} className="dark:bg-slate-950">สถานี: {st.stationName || st.name} ({st.arrivalTime || st.time} น.)</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-black uppercase text-slate-400 tracking-wider mb-1.5">ระบุวันที่ต้องการเดินทาง (เพิ่มได้หลายวัน)</label>
+                  <div className="flex gap-2">
+                    <input 
+                      type="date" 
+                      id="multiDateInput"
+                      className="w-full border border-slate-200 dark:border-slate-800 dark:bg-slate-950 p-2.5 rounded-xl text-slate-900 dark:text-white font-bold focus:outline-none focus:border-blue-500 text-xs" 
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        const inputEl = document.getElementById('multiDateInput') as HTMLInputElement;
+                        if (inputEl && inputEl.value) {
+                          const val = inputEl.value;
+                          const currentList = travelDate ? travelDate.split(',').map((d: string) => d.trim()).filter(Boolean) : [];
+                          if (!currentList.includes(val)) {
+                            currentList.push(val);
+                            currentList.sort();
+                            setTravelDate(currentList.join(','));
+                          }
+                          inputEl.value = '';
+                        }
+                      }}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 rounded-xl text-xs font-bold whitespace-nowrap cursor-pointer"
+                    >
+                      + เพิ่มวัน
+                    </button>
+                  </div>
                 </div>
 
                 {travelDate && (
                   <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 space-y-2">
-                    <div className="grid grid-cols-2 gap-2 text-center">
-                      <div className="bg-white dark:bg-slate-900 p-2 rounded-lg border border-slate-100 dark:border-slate-800"><span className="text-[10px] text-slate-400 block">ลงทะเบียนแล้ว</span><span className="text-sm font-bold text-slate-800 dark:text-white">{currentTotalBooked} ราย</span></div>
-                      <div className="bg-slate-100 dark:bg-slate-800 p-2 rounded-lg border dark:border-slate-700"><span className="text-[10px] text-slate-500 dark:text-slate-400 block">คงเหลือที่นั่งว่าง</span><span className="text-sm font-bold text-slate-900 dark:text-white">{currentAvailableSeats} ที่นั่ง</span></div>
+                    <span className="text-[11px] font-bold text-slate-500 dark:text-slate-400 block">วันที่เลือกไว้แล้ว:</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {travelDate.split(',').map((d: string, idx: number) => (
+                        <span key={idx} className="bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                          {d.trim()}
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              const list = travelDate.split(',').map((item: string) => item.trim()).filter((item: string) => item !== d.trim());
+                              setTravelDate(list.join(','));
+                            }}
+                            className="text-rose-500 hover:text-rose-700 font-black cursor-pointer"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
                     </div>
                   </div>
                 )}
 
                 <div className="flex gap-2 pt-2">
-                  <button type="button" onClick={() => setBookingStep(1)} className="w-1/3 bg-slate-100 dark:bg-slate-800 dark:text-white py-2.5 rounded-xl font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer">ย้อนกลับ</button>
-                  <button type="button" onClick={() => setBookingStep(3)} className="w-2/3 bg-slate-900 hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl text-center cursor-pointer">ขั้นตอนถัดไป (ตรวจสอบข้อมูล) →</button>
+                  <button onClick={() => setBookingStep(1)} className="w-1/3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold py-2.5 rounded-xl text-xs cursor-pointer">← ย้อนกลับ</button>
+                  <button onClick={() => {
+                    if (!travelDate) {
+                      showAlert('warning', 'ยังไม่ได้เลือกวันที่', 'กรุณาเพิ่มวันที่ต้องการเดินทางอย่างน้อย 1 วัน');
+                      return;
+                    }
+                    setBookingStep(3);
+                  }} className="w-2/3 bg-slate-900 hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl text-xs cursor-pointer">ตรวจสอบข้อมูลก่อนจอง →</button>
                 </div>
               </div>
             )}
 
             {bookingStep === 3 && (
               <div className="space-y-4">
-                <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2.5">
-                  <span className="block text-[11px] font-black uppercase text-slate-400 tracking-wider">สรุปข้อมูลส่วนบุคคลและการเดินทาง</span>
-                  <div className="space-y-1.5 border-b border-slate-200 dark:border-slate-800 pb-2 text-sm">
-                    <p className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">ชื่อผู้เดินทาง:</span> <span className="font-bold">{employeeName}</span></p>
-                    <p className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">เบอร์ติดต่อ:</span> <span className="font-mono font-bold">{employeePhone}</span></p>
-                  </div>
-                  <div className="space-y-1.5 text-sm">
-                    <p className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">สายรถตู้:</span> <span className="font-bold text-blue-600 dark:text-blue-400">{selectedRouteName}</span></p>
-                    <p className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">จุดขึ้นรถ:</span> <span className="font-bold">{currentActiveRoute?.stations[selectedStationIndex]?.stationName}</span></p>
-                    <p className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">เวลารถออกประมาณ:</span> <span className="font-mono font-bold">{currentActiveRoute?.stations[selectedStationIndex]?.arrivalTime} น.</span></p>
-                    <p className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">วันที่ออกเดินทาง:</span> <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">{travelDate}</span></p>
-                  </div>
+                <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2 text-xs">
+                  <span className="block font-black uppercase text-blue-600 dark:text-blue-400 mb-2">🔍 สรุปข้อมูลการสำรองที่นั่ง (หลายวัน)</span>
+                  <p><strong>เส้นทาง:</strong> {selectedRouteName}</p>
+                  <p><strong>ชื่อพนักงาน:</strong> {employeeName}</p>
+                  <p><strong>เบอร์โทร:</strong> {employeePhone}</p>
+                  <p><strong>กะทำงาน:</strong> {selectedShift}</p>
+                  <p><strong>จุดขึ้นรถ:</strong> {activeStations[selectedStationIndex]?.stationName || activeStations[selectedStationIndex]?.name} ({activeStations[selectedStationIndex]?.arrivalTime || activeStations[selectedStationIndex]?.time} น.)</p>
+                  <p><strong>วันที่เดินทางทั้งหมด:</strong> {travelDate}</p>
                 </div>
 
                 <div className="flex gap-2 pt-2">
-                  <button type="button" onClick={() => setBookingStep(2)} className="w-1/3 bg-slate-100 dark:bg-slate-800 dark:text-white py-2.5 rounded-xl font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer">ย้อนกลับ</button>
-                  <button type="button" disabled={isBookingLoading} onClick={handleCreateBooking} className="w-2/3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-center shadow-lg transition-all disabled:opacity-50 cursor-pointer">
-                    {isBookingLoading ? 'กำลังบันทึก...' : '✅ ยืนยันการสำรองที่นั่ง'}
+                  <button onClick={() => setBookingStep(2)} className="w-1/3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-semibold py-2.5 rounded-xl text-xs cursor-pointer">← แก้ไข</button>
+                  <button onClick={async () => {
+                    if (!currentActiveRoute || !travelDate || !employeeName || !employeePhone) {
+                      showAlert('warning', 'ข้อมูลไม่ครบถ้วน', 'โปรดกรอกชื่อ เบอร์โทรศัพท์ และระบุวันเดินทางก่อนดำเนินการ');
+                      return;
+                    }
+
+                    const datesArray = travelDate.split(',').map((d: string) => d.trim()).filter(Boolean);
+                    const stationsList = getRouteStations(currentActiveRoute);
+                    const targetStation = stationsList[selectedStationIndex];
+                    const currentEmployeeEmail = user?.email || 'employee@company.com';
+
+                    setIsBookingLoading(true);
+                    try {
+                      let lastDocRef: any = null;
+                      for (const d of datesArray) {
+                        const { adjustedDate } = checkCutoffTimeAndAdjustDate(d);
+                        const bookingData = {
+                          employeeEmail: currentEmployeeEmail, 
+                          employeeName, 
+                          employeePhone,
+                          route: selectedRouteName, 
+                          pickupLocation: targetStation?.stationName || targetStation?.name || 'ไม่ระบุ', 
+                          time: targetStation?.arrivalTime || targetStation?.time || 'ไม่ระบุ',
+                          driverName: currentActiveRoute.driver || currentActiveRoute.driverName || 'ไม่ระบุ', 
+                          vanPlate: currentActiveRoute.plate || currentActiveRoute.vanPlate || 'ไม่ระบุ',
+                          travelDate: adjustedDate, 
+                          shift: selectedShift,
+                          otDetails: 'ไม่มี',
+                          seatsCount: 1, 
+                          status: 'Confirmed', 
+                          timestamp: new Date().toISOString()
+                        };
+                        lastDocRef = await addDoc(collection(db, 'van_bookings'), bookingData);
+                      }
+
+                      if (lastDocRef) {
+                        setRecentBooking({ id: lastDocRef.id, employeeEmail: currentEmployeeEmail, employeeName, employeePhone, route: selectedRouteName, travelDate, vanPlate: currentActiveRoute.plate || currentActiveRoute.vanPlate || 'ไม่ระบุ' });
+                      }
+
+                      showAlert('success', 'สำรองที่นั่งสำเร็จทุกวัน', 'ระบบบันทึกรายการจองตามวันที่คุณเลือกทั้งหมดเรียบร้อย', () => {
+                        setActiveMenu('qrcode');
+                        setBookingStep(1);
+                      });
+                    } catch {
+                      showAlert('error', 'เกิดข้อผิดพลาด', 'ระบบขัดข้องในการเชื่อมต่อฐานข้อมูล');
+                    } finally { setIsBookingLoading(false); }
+                  }} disabled={isBookingLoading} className="w-2/3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-xs shadow-lg disabled:opacity-50 cursor-pointer">
+                    {isBookingLoading ? 'กำลังบันทึก...' : 'ยืนยันสำรองสิทธิ์หลายวัน ✓'}
                   </button>
                 </div>
               </div>
