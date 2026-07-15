@@ -30,17 +30,21 @@ export default function AdminView({
   const [adminTab, setAdminTab] = useState<'overview' | 'routes' | 'announcements' | 'tickets' | 'cancellation'>('overview');
   const [ticketSubTab, setTicketSubTab] = useState<'Pending' | 'Processing' | 'Resolved'>('Pending');
 
-  // State สำหรับกรองข้อมูลในหน้าสรุปภาพรวม
   const todayStr = new Date().toISOString().split('T')[0];
   const [selectedOverviewDate, setSelectedOverviewDate] = useState<string>(todayStr);
+  
+  // เปลี่ยนค่าเริ่มต้นตัวกรองเป็น Day
+  const [selectedShiftTypeFilter, setSelectedShiftTypeFilter] = useState<string>('ALL');
 
-  // ฟอร์มจัดการสายรถตู้
   const [editingRouteId, setEditingRouteId] = useState<string | null>(null);
   const [newRouteName, setNewRouteName] = useState('');
   const [newRoutePlate, setNewRoutePlate] = useState('');
   const [newRouteDriver, setNewRouteDriver] = useState('');
   const [newRoutePhone, setNewRoutePhone] = useState('');
-  const [newRouteShift, setNewRouteShift] = useState<'กะเช้า' | 'กะดึก'>('กะเช้า');
+  
+  // เปลี่ยนค่าเริ่มต้น state เป็น 'Day'
+  const [newRouteShift, setNewRouteShift] = useState<'Day' | 'Shift'>('Day');
+
   const [stationInput, setStationInput] = useState('');
   const [timeInput, setTimeInput] = useState('');
   const [stopsList, setStopsList] = useState<{ station: string; time: string }[]>([]);
@@ -80,7 +84,7 @@ export default function AdminView({
     setNewRoutePlate(r.plate || '');
     setNewRouteDriver(r.driver || '');
     setNewRoutePhone(r.phone || '');
-    setNewRouteShift(r.shift || 'กะเช้า');
+    setNewRouteShift(r.shift || 'Day');
     setStopsList(r.stops || []);
   };
 
@@ -90,7 +94,7 @@ export default function AdminView({
     setNewRoutePlate(''); 
     setNewRouteDriver(''); 
     setNewRoutePhone('');
-    setNewRouteShift('กะเช้า');
+    setNewRouteShift('Day');
     setStopsList([]);
   };
 
@@ -103,7 +107,7 @@ export default function AdminView({
         plate: newRoutePlate,
         driver: newRouteDriver,
         phone: newRoutePhone,
-        shift: newRouteShift,
+        shift: newRouteShift, // บันทึกเป็น Day หรือ Shift ลงฐานข้อมูล
         stops: stopsList,
         time: stopsList[0]?.time || '06.30 น.'
       };
@@ -220,10 +224,13 @@ export default function AdminView({
     }, true);
   };
 
-  // กรองการจองตามวันที่เลือกในหน้า Overview
-  const filteredBookingsByDate = selectedOverviewDate 
+  let filteredBookingsByDate = selectedOverviewDate 
     ? bookingsList.filter(b => b.travelDate === selectedOverviewDate)
     : bookingsList;
+
+  if (selectedShiftTypeFilter !== 'ALL') {
+    filteredBookingsByDate = filteredBookingsByDate.filter(b => b.shiftType === selectedShiftTypeFilter || b.shift === selectedShiftTypeFilter);
+  }
 
   const handlePrintPDF = () => {
     window.print();
@@ -232,7 +239,6 @@ export default function AdminView({
   return (
     <div className="text-sm text-slate-800 dark:text-slate-100 max-w-6xl mx-auto space-y-6">
       
-      {/* Navigation Tabs -ซ่อนเวลาสั่งปริ้นท์ */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 gap-2 overflow-x-auto pb-px print:hidden">
         <button onClick={() => setAdminTab('overview')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap ${adminTab === 'overview' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>📊 สรุปภาพรวมการจอง</button>
         <button onClick={() => setAdminTab('routes')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap ${adminTab === 'routes' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>🚌 จัดการสายรถตู้ ({routesList.length})</button>
@@ -243,21 +249,37 @@ export default function AdminView({
 
       {adminTab === 'overview' && (
         <div className="space-y-6">
-          {/* ส่วนตัวเลือกวันที่และปุ่มพิมพ์ PDF */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white dark:bg-slate-900 p-4 border rounded-2xl shadow-sm border-slate-200 dark:border-slate-800 print:hidden">
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <label className="text-xs font-bold text-slate-500 uppercase whitespace-nowrap">📅 เลือกวันที่ต้องการสรุป:</label>
-              <input 
-                type="date" 
-                value={selectedOverviewDate} 
-                onChange={(e) => setSelectedOverviewDate(e.target.value)} 
-                className="border border-slate-200 dark:border-slate-800 p-2 rounded-xl text-xs dark:bg-slate-950 font-mono"
-              />
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white dark:bg-slate-900 p-4 border rounded-2xl shadow-sm border-slate-200 dark:border-slate-800 print:hidden">
+            <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-bold text-slate-500 uppercase whitespace-nowrap">📅 วันที่:</label>
+                <input 
+                  type="date" 
+                  value={selectedOverviewDate} 
+                  onChange={(e) => setSelectedOverviewDate(e.target.value)} 
+                  className="border border-slate-200 dark:border-slate-800 p-2 rounded-xl text-xs dark:bg-slate-950 font-mono"
+                />
+              </div>
+
+              {/* ตัวกรองเปลี่ยนเป็น Day / Shift */}
+              <div className="flex items-center gap-2">
+                <label className="text-xs font-bold text-slate-500 uppercase whitespace-nowrap">⚡ กะ:</label>
+                <select
+                  value={selectedShiftTypeFilter}
+                  onChange={(e) => setSelectedShiftTypeFilter(e.target.value)}
+                  className="border border-slate-200 dark:border-slate-800 p-2 rounded-xl text-xs dark:bg-slate-950 font-bold"
+                >
+                  <option value="ALL">ทุกกะ (All Shifts)</option>
+                  <option value="Day">Day</option>
+                  <option value="Shift">Shift</option>
+                </select>
+              </div>
+
               <button 
-                onClick={() => setSelectedOverviewDate('')} 
+                onClick={() => { setSelectedOverviewDate(''); setSelectedShiftTypeFilter('ALL'); }} 
                 className="text-xs bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-xl font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200"
               >
-                ดูทั้งหมด
+                รีเซ็ตตัวกรอง
               </button>
             </div>
             <button 
@@ -268,52 +290,72 @@ export default function AdminView({
             </button>
           </div>
 
-          {/* หัวข้อรายงานตอนพิมพ์ */}
           <div className="hidden print:block text-center space-y-1 mb-6">
             <h2 className="text-xl font-bold">รายงานสรุปยอดการจองรถตู้พนักงาน</h2>
-            <p className="text-sm text-slate-500">ประจำวันที่: {selectedOverviewDate || 'ทุกวันทั้งหมดในระบบ'}</p>
+            <p className="text-sm text-slate-500">ประจำวันที่: {selectedOverviewDate || 'ทุกวันทั้งหมดในระบบ'} | กะ: {selectedShiftTypeFilter === 'ALL' ? 'ทั้งหมด' : selectedShiftTypeFilter}</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 print:hidden">
-            <div className="p-5 bg-white dark:bg-slate-900 border rounded-2xl shadow-sm border-slate-200 dark:border-slate-800"><span className="text-[11px] font-bold text-slate-400 uppercase">ยอดจองในวันที่เลือก</span><p className="text-2xl font-black mt-1 text-slate-900 dark:text-white">{filteredBookingsByDate.length} <span className="text-xs font-normal text-slate-500">ที่นั่ง</span></p></div>
+            <div className="p-5 bg-white dark:bg-slate-900 border rounded-2xl shadow-sm border-slate-200 dark:border-slate-800"><span className="text-[11px] font-bold text-slate-400 uppercase">ยอดจองตามเงื่อนไข</span><p className="text-2xl font-black mt-1 text-slate-900 dark:text-white">{filteredBookingsByDate.length} <span className="text-xs font-normal text-slate-500">ที่นั่ง</span></p></div>
             <div className="p-5 bg-white dark:bg-slate-900 border rounded-2xl shadow-sm border-slate-200 dark:border-slate-800"><span className="text-[11px] font-bold text-slate-400 uppercase">สายรถในระบบทั้งหมด</span><p className="text-2xl font-black mt-1 text-blue-600 dark:text-blue-400">{routesList.length} <span className="text-xs font-normal text-slate-500">สาย</span></p></div>
             <div className="p-5 bg-white dark:bg-slate-900 border rounded-2xl shadow-sm border-slate-200 dark:border-slate-800"><span className="text-[11px] font-bold text-slate-400 uppercase">ตั๋วปัญหารอดำเนินการค้างอยู่</span><p className="text-2xl font-black mt-1 text-amber-500">{pendingTicketsCount} <span className="text-xs font-normal text-slate-500">เรื่อง</span></p></div>
           </div>
 
-          {/* สรุปแยกตามรายสายรถจริง (4 สาย) */}
           <div className="space-y-4">
-            <h3 className="text-xs font-black text-slate-500 uppercase tracking-wider">🚌 สรุปยอดและรายชื่อผู้โดยสารแยกตามแต่ละสายรถตู้</h3>
+            <h3 className="text-xs font-black text-slate-500 uppercase tracking-wider">🚌 สรุปยอดและรายชื่อผู้โดยสารแยกตามแต่ละสายรถตู้และกะ</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {routesList.map((route) => {
-                // กรองการจองที่ตรงกับชื่อสายรถนี้ และตรงกับวันที่เลือก
-                const routeBookings = filteredBookingsByDate.filter(b => b.route === route.name);
+                const routeBookings = filteredBookingsByDate.filter(b => {
+                  const matchRoute = b.route === route.name;
+                  const matchShift = !route.shift || b.shiftType === route.shift || b.shift === route.shift;
+                  return matchRoute && matchShift;
+                });
                 
                 return (
                   <div key={route.id} className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm space-y-3">
                     <div className="flex justify-between items-start border-b pb-3">
                       <div>
-                        <h4 className="font-extrabold text-blue-600 dark:text-blue-400 text-base">{route.name}</h4>
-                        <p className="text-xs text-slate-400 mt-0.5">ทะเบียน: {route.plate || '-'} | คนขับ: {route.driver || '-'} ({route.phone || '-'})</p>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-extrabold text-blue-600 dark:text-blue-400 text-base">{route.name}</h4>
+                          <span className={`text-[10px] px-2 py-0.5 rounded font-bold border ${route.shift === 'Shift' ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900' : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900'}`}>
+                            {route.shift || 'Day'}
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-1">ทะเบียน: {route.plate || '-'} | คนขับ: {route.driver || '-'} ({route.phone || '-'})</p>
                       </div>
-                      <span className="bg-blue-50 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300 font-black text-xs px-2.5 py-1 rounded-xl border border-blue-100 dark:border-blue-900">
+                      <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-black text-xs px-2.5 py-1 rounded-xl">
                         {routeBookings.length} คน
                       </span>
                     </div>
 
                     {routeBookings.length === 0 ? (
-                      <p className="text-xs text-slate-400 italic py-2">ไม่มีผู้โดยสารจองในสายนี้วันนี้</p>
+                      <p className="text-xs text-slate-400 italic py-2">ไม่มีผู้โดยสารจองในสายและกะนี้ตามเงื่อนไขที่เลือก</p>
                     ) : (
-                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                        {routeBookings.map((b, bIdx) => (
-                          <div key={b.id || bIdx} className="flex justify-between items-center bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 text-xs">
-                            <div>
-                              <span className="font-bold text-slate-800 dark:text-slate-100">{bIdx + 1}. {b.employeeName}</span>
-                              <span className="block text-[11px] text-slate-400">จุดรับ: {b.pickupLocation} ({b.time} น.)</span>
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {routeBookings.map((b, bIdx) => {
+                          const isDayShift = (b.shiftType || b.shift) === 'Day';
+                          return (
+                            <div key={b.id || bIdx} className="flex justify-between items-start bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 text-xs">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-slate-800 dark:text-slate-100">{bIdx + 1}. {b.employeeName}</span>
+                                  {b.shiftType && (
+                                    <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${
+                                      isDayShift 
+                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900' 
+                                        : 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900'
+                                    }`}>
+                                      {b.shiftType} {b.shiftTimeSlot ? `(${b.shiftTimeSlot})` : ''}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="block text-[11px] text-slate-400">จุดรับ: {b.pickupLocation} ({b.time} น.)</span>
+                              </div>
+                              <span className="font-mono text-xs font-semibold text-slate-600 dark:text-slate-300 mt-0.5">{b.employeePhone || '-'}</span>
                             </div>
-                            <span className="font-mono text-xs font-semibold text-slate-600 dark:text-slate-300">{b.employeePhone || '-'}</span>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -334,36 +376,38 @@ export default function AdminView({
               )}
             </div>
             <form onSubmit={handleSaveRoute} className="space-y-3 text-xs">
+              
+              {/* ปุ่มเลือกเปลี่ยนเป็น Day / Shift */}
               <div>
-                <label className="block text-slate-400 font-bold mb-1">เลือกกะการทำงาน</label>
+                <label className="block text-slate-400 font-bold mb-1">เลือกกะการทำงานสายรถ</label>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => setNewRouteShift('กะเช้า')}
+                    onClick={() => setNewRouteShift('Day')}
                     className={`p-2.5 rounded-xl border font-bold transition-all cursor-pointer ${
-                      newRouteShift === 'กะเช้า' 
+                      newRouteShift === 'Day' 
                         ? 'bg-blue-600 border-blue-600 text-white shadow-md' 
                         : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                     }`}
                   >
-                    กะเช้า
+                    ☀️ Day
                   </button>
                   <button
                     type="button"
-                    onClick={() => setNewRouteShift('กะดึก')}
+                    onClick={() => setNewRouteShift('Shift')}
                     className={`p-2.5 rounded-xl border font-bold transition-all cursor-pointer ${
-                      newRouteShift === 'กะดึก' 
+                      newRouteShift === 'Shift' 
                         ? 'bg-blue-600 border-blue-600 text-white shadow-md' 
                         : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                     }`}
                   >
-                    กะดึก
+                    🌙 Shift
                   </button>
                 </div>
               </div>
 
-              <div><label className="block text-slate-400 font-bold mb-1">ชื่อเรียกสายรถ (เช่น สายระยอง-มาบตาพุด)</label><input type="text" placeholder="ชื่อสายรถ..." value={newRouteName} onChange={e => setNewRouteName(e.target.value)} className="w-full border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl dark:bg-slate-950 focus:outline-none focus:border-blue-500" required /></div>
-              <div><label className="block text-slate-400 font-bold mb-1">เลขทะเบียนรถ</label><input type="text" placeholder="เช่น กข001" value={newRoutePlate} onChange={e => setNewRoutePlate(e.target.value)} className="w-full border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl dark:bg-slate-950 focus:outline-none focus:border-blue-500" required /></div>
+              <div><label className="block text-slate-400 font-bold mb-1">ชื่อเรียกสายรถ (เช่น สายบ้านฉาง)</label><input type="text" placeholder="ชื่อสายรถ..." value={newRouteName} onChange={e => setNewRouteName(e.target.value)} className="w-full border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl dark:bg-slate-950 focus:outline-none focus:border-blue-500" required /></div>
+              <div><label className="block text-slate-400 font-bold mb-1">เลขทะเบียนรถ</label><input type="text" placeholder="เช่น Fv04" value={newRoutePlate} onChange={e => setNewRoutePlate(e.target.value)} className="w-full border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl dark:bg-slate-950 focus:outline-none focus:border-blue-500" required /></div>
               <div><label className="block text-slate-400 font-bold mb-1">ชื่อพนักงานคนขับ</label><input type="text" placeholder="ชื่อคนขับ..." value={newRouteDriver} onChange={e => setNewRouteDriver(e.target.value)} className="w-full border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl dark:bg-slate-950 focus:outline-none focus:border-blue-500" /></div>
               <div><label className="block text-slate-400 font-bold mb-1">เบอร์โทรศัพท์สายตรงคนขับ</label><input type="text" placeholder="เบอร์โทร..." value={newRoutePhone} onChange={e => setNewRoutePhone(e.target.value)} className="w-full border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl dark:bg-slate-950 focus:outline-none focus:border-blue-500" /></div>
               
@@ -398,7 +442,7 @@ export default function AdminView({
                 <div className="space-y-2">
                   <h4 className="font-bold text-slate-900 dark:text-white text-sm">
                     {r.name} 
-                    <span className="ml-2 inline-block bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 text-[10px] px-2 py-0.5 rounded font-bold border border-blue-100 dark:border-blue-900">{r.shift || 'กะเช้า'}</span>
+                    <span className="ml-2 inline-block bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 text-[10px] px-2 py-0.5 rounded font-bold border border-blue-100 dark:border-blue-900">{r.shift || 'Day'}</span>
                     <span className="block text-slate-400 font-normal text-xs font-mono mt-0.5">ทะเบียน: {r.plate || '-'} · คนขับ: {r.driver || '-'} ({r.phone || '-'})</span>
                   </h4>
                   <div className="flex flex-wrap gap-2 pt-1">

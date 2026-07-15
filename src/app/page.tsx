@@ -1,35 +1,24 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
-import { getFirestore, collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
+import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+
+// นำเข้า auth และ db จากไฟล์กลาง src/lib/firebase.ts ของโปรเจกต์
+import { auth, db } from '../lib/firebase';
 
 // นำเข้าหน้าย่อยที่แยกไว้
 import UserView from '../components/UserView';
 import AdminView from '../components/AdminView';
-
-const firebaseConfig = {
-  apiKey: "AIzaSyAKXKm-9nj24zFN1kyGt_YSOcnTfwWXGHg",
-  authDomain: "employee-van-booking.firebaseapp.com",
-  projectId: "employee-van-booking",
-  storageBucket: "employee-van-booking.firebasestorage.app",
-  messagingSenderId: "113295103792",
-  appId: "1:113295103792:web:6474b89b1f275238341af5",
-};
-
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
 
 export default function EnterpriseVanBookingSystem() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [activeMenu, setActiveMenu] = useState<'home' | 'booking' | 'history' | 'qrcode' | 'admin'>('home');
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // 🔥 เพิ่ม State สำหรับเปิด-ปิดเมนูบนมือถือ
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // ตรวจสอบสิทธิ์ว่าเป็นแอดมินหรือไม่ (สามารถเปลี่ยนเมลแอดมินตรงนี้ได้ครับ)
+  // ตรวจสอบสิทธิ์ว่าเป็นแอดมินหรือไม่
   const isAdmin = user?.email === 'admin@company.com';
 
   // เด้งกลับหน้าหลักอัตโนมัติถ้าแฮกเข้าเมนูแอดมินผ่าน url/state
@@ -52,7 +41,7 @@ export default function EnterpriseVanBookingSystem() {
   const [routesList, setRoutesList] = useState<any[]>([]);
   const [bookingsList, setBookingsList] = useState<any[]>([]);
   const [announcementsList, setAnnouncementsList] = useState<any[]>([]);
-  const [ticketsList, setTicketsList] = useState<any[]>([]); // เก็บตั๋วแจ้งปัญหา
+  const [ticketsList, setTicketsList] = useState<any[]>([]);
   const [recentBooking, setRecentBooking] = useState<any>(null);
 
   // Login Form States
@@ -84,7 +73,6 @@ export default function EnterpriseVanBookingSystem() {
       setAnnouncementsList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    // ดึงข้อมูลตั๋วแจ้งปัญหาจากคอลเลกชัน support_tickets แบบ Realtime
     const unsubscribeTickets = onSnapshot(query(collection(db, 'support_tickets'), orderBy('timestamp', 'desc')), (snapshot) => {
       setTicketsList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
@@ -94,7 +82,7 @@ export default function EnterpriseVanBookingSystem() {
       unsubscribeRoutes();
       unsubscribeBookings();
       unsubscribeAnnounce();
-      unsubscribeTickets(); // คืนค่าปิดตัวจับการเปลี่ยนแปลงตั๋วปัญหาเมื่อเลิกใช้หน้าเว็บ
+      unsubscribeTickets();
     };
   }, [user]);
 
