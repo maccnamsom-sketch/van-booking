@@ -53,16 +53,23 @@ export default function UserView({
   };
 
   const [selectedSummaryDate, setSelectedSummaryDate] = useState(getTodayDateString());
-  const [activeChatTicketId, setActiveChatTicketId] = useState<string | null>(null);
+  const [, setActiveChatTicketId] = useState<string | null>(null);
 
   // State สำหรับระบบกะและการจองรถตู้
   const [shiftType, setShiftType] = useState<'Day' | 'Shift'>('Day');
   const [shiftTimeSlot, setShiftTimeSlot] = useState<string>('08:00 - 17:00');
   const [employeeName, setEmployeeName] = useState('');
   const [employeePhone, setEmployeePhone] = useState('');
-  const [selectedRouteId, setSelectedRouteId] = useState(routesList[0]?.id || '');
-  const [selectedRouteName, setSelectedRouteName] = useState(routesList[0]?.name || '');
-  const [selectedRouteMaxSeats, setSelectedRouteMaxSeats] = useState(routesList[0]?.totalSeats || 14);
+  
+  // กรองสายรถตามกะที่เลือก (รองรับ field shiftType ของสายรถ เช่น 'Day', 'Shift' หรือถ้าไม่ระบุให้ถือว่าใช้ได้ทุกกะ)
+  const filteredRoutesList = routesList.filter(r => {
+    if (!r.shiftType || r.shiftType === 'All' || r.shiftType === ' ทุกกะ') return true;
+    return r.shiftType === shiftType;
+  });
+
+  const [selectedRouteId, setSelectedRouteId] = useState(filteredRoutesList[0]?.id || routesList[0]?.id || '');
+  const [selectedRouteName, setSelectedRouteName] = useState(filteredRoutesList[0]?.name || routesList[0]?.name || '');
+  const [, setSelectedRouteMaxSeats] = useState(filteredRoutesList[0]?.totalSeats || routesList[0]?.totalSeats || 14);
   const [selectedStationIndex, setSelectedStationIndex] = useState<number>(0);
   const [travelDate, setTravelDate] = useState('');
 
@@ -86,7 +93,7 @@ export default function UserView({
     return `${dd}/${mm}/${yyyy}`;
   };
 
-  const currentActiveRoute = routesList.find(r => r.id === selectedRouteId) || routesList[0];
+  const currentActiveRoute = filteredRoutesList.find(r => r.id === selectedRouteId) || filteredRoutesList[0] || routesList[0];
   const getRouteStations = (route: any) => {
     if (!route) return [];
     return route.stops || route.stations || [];
@@ -131,7 +138,7 @@ export default function UserView({
       setTicketSubject('');
       setTicketFirstMessage('');
       setActiveChatTicketId(docRef.id);
-    } catch (error) {
+    } catch {
       showAlert('error', 'เกิดข้อผิดพลาด', 'ไม่สามารถสร้างรายการแจ้งปัญหาได้');
     } finally {
       setIsSubmittingTicket(false);
@@ -227,7 +234,7 @@ export default function UserView({
         </div>
       )}
 
-      {/* 2. BOOKING TAB (ระบบสำรองที่นั่งเลือกกะ Day/Shift รองรับหลายวัน) */}
+      {/* 2. BOOKING TAB (ระบบสำรองที่นั่งเลือกกะ Day/Shift รองรับหลายวัน และกรองสายรถตามกะอัตโนมัติ) */}
       {activeMenu === 'booking' && (
         <div className="max-w-md mx-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-2xl text-slate-800 dark:text-white">
           <div className="bg-slate-950 text-white p-5 text-center border-b border-slate-800">
@@ -244,7 +251,7 @@ export default function UserView({
           </div>
 
           <div className="p-6 space-y-4">
-            {/* ขั้นตอนที่ 1: เลือกประเภทกะ และช่วงเวลา + เลือกสายรถ */}
+            {/* ขั้นตอนที่ 1: เลือกประเภทกะ และช่วงเวลา + เลือกสายรถที่กรองแล้ว */}
             {bookingStep === 1 && (
               <div className="space-y-4">
                 <div className="space-y-3">
@@ -256,20 +263,36 @@ export default function UserView({
                       onClick={() => {
                         setShiftType('Day');
                         setShiftTimeSlot('08:00 - 17:00');
+                        // รีเซ็ตค่าสายรถไปที่ตัวแรกของกะ Day ที่กรองได้
+                        const newFiltered = routesList.filter(r => !r.shiftType || r.shiftType === 'All' || r.shiftType === 'Day');
+                        if (newFiltered.length > 0) {
+                          setSelectedRouteId(newFiltered[0].id);
+                          setSelectedRouteName(newFiltered[0].name);
+                          setSelectedRouteMaxSeats(newFiltered[0].totalSeats || 14);
+                        }
+                        setSelectedStationIndex(0);
                       }}
                       className={`p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${shiftType === 'Day' ? 'bg-blue-600 border-blue-600 text-white shadow-md' : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
                     >
-                      ☀️ กะ Day (สีฟ้า)
+                      ☀️ กะ Day
                     </button>
                     <button 
                       type="button"
                       onClick={() => {
                         setShiftType('Shift');
                         setShiftTimeSlot('06:00 - 18:30');
+                        // รีเซ็ตค่าสายรถไปที่ตัวแรกของกะ Shift ที่กรองได้
+                        const newFiltered = routesList.filter(r => !r.shiftType || r.shiftType === 'All' || r.shiftType === 'Shift');
+                        if (newFiltered.length > 0) {
+                          setSelectedRouteId(newFiltered[0].id);
+                          setSelectedRouteName(newFiltered[0].name);
+                          setSelectedRouteMaxSeats(newFiltered[0].totalSeats || 14);
+                        }
+                        setSelectedStationIndex(0);
                       }}
                       className={`p-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${shiftType === 'Shift' ? 'bg-purple-600 border-purple-600 text-white shadow-md' : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
                     >
-                      🌙 กะ Shift (สีชมพู)
+                      🌙 กะ Shift
                     </button>
                   </div>
 
@@ -308,28 +331,49 @@ export default function UserView({
                 </div>
 
                 <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
-                  <label className="block text-[11px] font-black uppercase text-blue-600 dark:text-blue-400 tracking-wider">1.2 เลือกสายรถตู้สวัสดิการ</label>
+                  <div className="flex justify-between items-center">
+                    <label className="block text-[11px] font-black uppercase text-blue-600 dark:text-blue-400 tracking-wider">1.2 เลือกสายรถตู้สวัสดิการ ({shiftType})</label>
+                    <span className="text-[10px] text-slate-400">พบ {filteredRoutesList.length} สายรถ</span>
+                  </div>
+                  
                   <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-                    {routesList.map(r => (
-                      <div 
-                        key={r.id} 
-                        onClick={() => { 
-                          setSelectedRouteId(r.id); 
-                          setSelectedRouteName(r.name); 
-                          setSelectedRouteMaxSeats(r.totalSeats || 14); 
-                          setSelectedStationIndex(0);
-                        }} 
-                        className={`p-3.5 border rounded-xl cursor-pointer transition-all ${selectedRouteId === r.id ? 'border-blue-600 bg-blue-50/20 dark:bg-blue-950/25 ring-1 ring-blue-600' : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
-                      >
-                        <p className="font-bold text-slate-900 dark:text-white text-xs">{r.name}</p>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">ทะเบียน: {r.plate || r.vanPlate} · คนขับ: {r.driver || r.driverName}</p>
+                    {filteredRoutesList.length > 0 ? (
+                      filteredRoutesList.map(r => (
+                        <div 
+                          key={r.id} 
+                          onClick={() => { 
+                            setSelectedRouteId(r.id); 
+                            setSelectedRouteName(r.name); 
+                            setSelectedRouteMaxSeats(r.totalSeats || 14); 
+                            setSelectedStationIndex(0);
+                          }} 
+                          className={`p-3.5 border rounded-xl cursor-pointer transition-all ${selectedRouteId === r.id ? 'border-blue-600 bg-blue-50/20 dark:bg-blue-950/25 ring-1 ring-blue-600' : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
+                        >
+                          <div className="flex justify-between items-start">
+                            <p className="font-bold text-slate-900 dark:text-white text-xs">{r.name}</p>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                              {r.shiftType || 'ทุกกะ'}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">ทะเบียน: {r.plate || r.vanPlate} · คนขับ: {r.driver || r.driverName}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-4 text-center text-xs text-slate-400 border border-dashed rounded-xl">
+                        ไม่พบสายรถสำหรับ {shiftType} ในระบบขณะนี้
                       </div>
-                    ))}
+                    )}
                   </div>
                 </div>
 
                 <button 
-                  onClick={() => setBookingStep(2)} 
+                  onClick={() => {
+                    if (filteredRoutesList.length === 0) {
+                      showAlert('warning', 'ไม่พบสายรถ', 'กรุณาเลือกกะที่มีสายรถให้บริการ');
+                      return;
+                    }
+                    setBookingStep(2);
+                  }} 
                   className="w-full bg-slate-900 hover:bg-black dark:bg-slate-800 dark:hover:bg-slate-700 text-white font-semibold py-2.5 rounded-xl text-center mt-2 cursor-pointer text-xs"
                 >
                   ขั้นตอนถัดไป (กรอกข้อมูลส่วนตัว & จุดขึ้นรถ) →

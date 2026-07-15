@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { collection, doc, updateDoc, addDoc, deleteDoc, arrayUnion } from 'firebase/firestore';
 
 interface AdminViewProps {
@@ -30,10 +30,16 @@ export default function AdminView({
   const [adminTab, setAdminTab] = useState<'overview' | 'routes' | 'announcements' | 'tickets' | 'cancellation'>('overview');
   const [ticketSubTab, setTicketSubTab] = useState<'Pending' | 'Processing' | 'Resolved'>('Pending');
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const getTodayDateString = () => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const todayStr = getTodayDateString();
   const [selectedOverviewDate, setSelectedOverviewDate] = useState<string>(todayStr);
-  
-  // เปลี่ยนค่าเริ่มต้นตัวกรองเป็น Day
   const [selectedShiftTypeFilter, setSelectedShiftTypeFilter] = useState<string>('ALL');
 
   const [editingRouteId, setEditingRouteId] = useState<string | null>(null);
@@ -42,7 +48,6 @@ export default function AdminView({
   const [newRouteDriver, setNewRouteDriver] = useState('');
   const [newRoutePhone, setNewRoutePhone] = useState('');
   
-  // เปลี่ยนค่าเริ่มต้น state เป็น 'Day'
   const [newRouteShift, setNewRouteShift] = useState<'Day' | 'Shift'>('Day');
 
   const [stationInput, setStationInput] = useState('');
@@ -53,7 +58,7 @@ export default function AdminView({
   const [newAnnounceContent, setNewAnnounceContent] = useState('');
 
   const [replyMessages, setReplyMessages] = useState<{ [ticketId: string]: string }>({}); 
-  const [updatingTicketId, setUpdatingTicketId] = useState<string | null>(null);
+  const [, setUpdatingTicketId] = useState<string | null>(null);
 
   const combinedCancelRequests = [
     ...cancellationRequestsList,
@@ -66,6 +71,16 @@ export default function AdminView({
   const cancelRequestsCount = combinedCancelRequests.length;
 
   const filteredTickets = supportTicketsList.filter(t => t.status === ticketSubTab);
+
+  const formatThaiDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return dateStr;
+    const yyyy = parseInt(parts[0], 10) + 543;
+    const mm = parts[1];
+    const dd = parts[2];
+    return `${dd}/${mm}/${yyyy}`;
+  };
 
   const handleAddStop = () => {
     if (!stationInput || !timeInput) return;
@@ -81,11 +96,11 @@ export default function AdminView({
   const handleEditRouteClick = (r: any) => {
     setEditingRouteId(r.id);
     setNewRouteName(r.name || '');
-    setNewRoutePlate(r.plate || '');
-    setNewRouteDriver(r.driver || '');
+    setNewRoutePlate(r.plate || r.vanPlate || '');
+    setNewRouteDriver(r.driver || r.driverName || '');
     setNewRoutePhone(r.phone || '');
-    setNewRouteShift(r.shift || 'Day');
-    setStopsList(r.stops || []);
+    setNewRouteShift(r.shiftType || r.shift || 'Day');
+    setStopsList(r.stops || r.stations || []);
   };
 
   const handleCancelEdit = () => {
@@ -105,11 +120,15 @@ export default function AdminView({
       const routeData = {
         name: newRouteName,
         plate: newRoutePlate,
+        vanPlate: newRoutePlate, // รองรับทั้งสองฟิลด์ฝั่ง user/admin
         driver: newRouteDriver,
+        driverName: newRouteDriver,
         phone: newRoutePhone,
-        shift: newRouteShift, // บันทึกเป็น Day หรือ Shift ลงฐานข้อมูล
+        shiftType: newRouteShift, // บันทึกประเภทกะ (Day หรือ Shift) ให้ตรงกับ UserView
+        shift: newRouteShift,
         stops: stopsList,
-        time: stopsList[0]?.time || '06.30 น.'
+        stations: stopsList,
+        totalSeats: 14
       };
 
       if (editingRouteId) {
@@ -120,7 +139,7 @@ export default function AdminView({
         showAlert('success', 'สำเร็จ', 'เพิ่มสายรถตู้เข้าสู่ระบบเรียบร้อยแล้ว');
       }
       handleCancelEdit();
-    } catch (err) {
+    } catch {
       showAlert('error', 'ผิดพลาด', 'ไม่สามารถบันทึกข้อมูลเส้นทางรถตู้ได้');
     }
   };
@@ -130,7 +149,7 @@ export default function AdminView({
       try {
         await deleteDoc(doc(db, 'van_routes', id));
         showAlert('success', 'ลบสำเร็จ', 'ลบเส้นทางเดินรถเรียบร้อยแล้ว');
-      } catch (err) {
+      } catch {
         showAlert('error', 'ผิดพลาด', 'ไม่สามารถลบเส้นทางรถตู้ออกจากฐานข้อมูลได้');
       }
     }, true);
@@ -142,12 +161,14 @@ export default function AdminView({
     try {
       await addDoc(collection(db, 'van_announcements'), {
         title: newAnnounceTitle,
+        desc: newAnnounceContent,
         content: newAnnounceContent,
         timestamp: new Date().toISOString()
       });
       showAlert('success', 'สำเร็จ', 'เพิ่มประกาศใหม่เรียบร้อยแล้ว');
-      setNewAnnounceTitle(''); setNewAnnounceContent('');
-    } catch (err) {
+      setNewAnnounceTitle(''); 
+      setNewAnnounceContent('');
+    } catch {
       showAlert('error', 'ผิดพลาด', 'ไม่สามารถโพสต์ประกาศข่าวสารได้');
     }
   };
@@ -157,7 +178,7 @@ export default function AdminView({
       try {
         await deleteDoc(doc(db, 'van_announcements', id));
         showAlert('success', 'ลบสำเร็จ', 'ลบประกาศออกจากระบบเรียบร้อยแล้ว');
-      } catch (err) {
+      } catch {
         showAlert('error', 'ผิดพลาด', 'ไม่สามารถลบประกาศข่าวสารได้');
       }
     }, true);
@@ -183,7 +204,7 @@ export default function AdminView({
         })
       });
       setReplyMessages(prev => ({ ...prev, [ticketId]: '' }));
-    } catch (err) {
+    } catch {
       showAlert('error', 'เกิดข้อผิดพลาด', 'ไม่สามารถส่งข้อความแชทตอบกลับพนักงานได้');
     } finally {
       setUpdatingTicketId(null);
@@ -194,7 +215,7 @@ export default function AdminView({
     try {
       await updateDoc(doc(db, 'support_tickets', ticketId), { status: newStatus });
       showAlert('success', 'อัปเดตสถานะสำเร็จ', `ย้ายใบงานแจ้งปัญหาไปยังหมวดหมู่ใหม่เรียบร้อยแล้ว`);
-    } catch (err) {
+    } catch {
       showAlert('error', 'เกิดข้อผิดพลาด', 'ไม่สามารถเปลี่ยนสถานะของใบงานแจ้งปัญหาได้');
     }
   };
@@ -204,7 +225,7 @@ export default function AdminView({
       try {
         await updateDoc(doc(db, 'support_tickets', ticketId), { status: 'Archived' });
         showAlert('success', 'จัดเก็บเรียบร้อย', 'ย้ายประวัติห้องแชทนี้เข้าสู่คลังเอกสารเก่าแล้ว');
-      } catch (err) {
+      } catch {
         showAlert('error', 'ผิดพลาด', 'ไม่สามารถจัดเก็บห้องแชทลงคลังเอกสารได้');
       }
     }, true);
@@ -218,7 +239,7 @@ export default function AdminView({
         }
         await deleteDoc(doc(db, collectionName, requestId));
         showAlert('success', 'ลบตั๋วสำเร็จ', 'อนุมัติคำขอยกเลิกและลบข้อมูลเรียบร้อยแล้ว');
-      } catch (err) {
+      } catch {
         showAlert('error', 'ผิดพลาด', 'ไม่สามารถลบตั๋วออกจากฐานข้อมูลได้');
       }
     }, true);
@@ -239,14 +260,16 @@ export default function AdminView({
   return (
     <div className="text-sm text-slate-800 dark:text-slate-100 max-w-6xl mx-auto space-y-6">
       
+      {/* Navigation Tabs */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 gap-2 overflow-x-auto pb-px print:hidden">
-        <button onClick={() => setAdminTab('overview')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap ${adminTab === 'overview' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>📊 สรุปภาพรวมการจอง</button>
-        <button onClick={() => setAdminTab('routes')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap ${adminTab === 'routes' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>🚌 จัดการสายรถตู้ ({routesList.length})</button>
-        <button onClick={() => setAdminTab('announcements')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap ${adminTab === 'announcements' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>📢 จัดการประกาศข่าว ({announcementsList.length})</button>
-        <button onClick={() => setAdminTab('tickets')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap flex items-center gap-1.5 ${adminTab === 'tickets' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>📬 กล่องข้อความแจ้งปัญหา {pendingTicketsCount > 0 && (<span className="bg-red-500 text-white text-[10px] h-4 px-1.5 rounded-full flex items-center justify-center font-bold animate-pulse">{pendingTicketsCount}</span>)}</button>
-        <button onClick={() => setAdminTab('cancellation')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap flex items-center gap-1.5 ${adminTab === 'cancellation' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>❌ คำขอยกเลิกตั๋ว {cancelRequestsCount > 0 && (<span className="bg-amber-500 text-white text-[10px] h-4 px-1.5 rounded-full flex items-center justify-center font-bold">{cancelRequestsCount}</span>)}</button>
+        <button onClick={() => setAdminTab('overview')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap cursor-pointer ${adminTab === 'overview' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>📊 สรุปภาพรวมการจอง</button>
+        <button onClick={() => setAdminTab('routes')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap cursor-pointer ${adminTab === 'routes' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>🚌 จัดการสายรถตู้ ({routesList.length})</button>
+        <button onClick={() => setAdminTab('announcements')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap cursor-pointer ${adminTab === 'announcements' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>📢 จัดการประกาศข่าว ({announcementsList.length})</button>
+        <button onClick={() => setAdminTab('tickets')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${adminTab === 'tickets' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>📬 กล่องข้อความแจ้งปัญหา {pendingTicketsCount > 0 && (<span className="bg-red-500 text-white text-[10px] h-4 px-1.5 rounded-full flex items-center justify-center font-bold animate-pulse">{pendingTicketsCount}</span>)}</button>
+        <button onClick={() => setAdminTab('cancellation')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${adminTab === 'cancellation' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>❌ คำขอยกเลิกตั๋ว {cancelRequestsCount > 0 && (<span className="bg-amber-500 text-white text-[10px] h-4 px-1.5 rounded-full flex items-center justify-center font-bold">{cancelRequestsCount}</span>)}</button>
       </div>
 
+      {/* 1. OVERVIEW TAB */}
       {adminTab === 'overview' && (
         <div className="space-y-6">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white dark:bg-slate-900 p-4 border rounded-2xl shadow-sm border-slate-200 dark:border-slate-800 print:hidden">
@@ -257,17 +280,16 @@ export default function AdminView({
                   type="date" 
                   value={selectedOverviewDate} 
                   onChange={(e) => setSelectedOverviewDate(e.target.value)} 
-                  className="border border-slate-200 dark:border-slate-800 p-2 rounded-xl text-xs dark:bg-slate-950 font-mono"
+                  className="border border-slate-200 dark:border-slate-800 p-2 rounded-xl text-xs dark:bg-slate-950 font-mono cursor-pointer"
                 />
               </div>
 
-              {/* ตัวกรองเปลี่ยนเป็น Day / Shift */}
               <div className="flex items-center gap-2">
                 <label className="text-xs font-bold text-slate-500 uppercase whitespace-nowrap">⚡ กะ:</label>
                 <select
                   value={selectedShiftTypeFilter}
                   onChange={(e) => setSelectedShiftTypeFilter(e.target.value)}
-                  className="border border-slate-200 dark:border-slate-800 p-2 rounded-xl text-xs dark:bg-slate-950 font-bold"
+                  className="border border-slate-200 dark:border-slate-800 p-2 rounded-xl text-xs dark:bg-slate-950 font-bold cursor-pointer"
                 >
                   <option value="ALL">ทุกกะ (All Shifts)</option>
                   <option value="Day">Day</option>
@@ -277,14 +299,14 @@ export default function AdminView({
 
               <button 
                 onClick={() => { setSelectedOverviewDate(''); setSelectedShiftTypeFilter('ALL'); }} 
-                className="text-xs bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-xl font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200"
+                className="text-xs bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-xl font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 cursor-pointer"
               >
                 รีเซ็ตตัวกรอง
               </button>
             </div>
             <button 
               onClick={handlePrintPDF} 
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all"
+              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold shadow-sm transition-all cursor-pointer"
             >
               🖨️ พิมพ์เอกสาร / บันทึก PDF
             </button>
@@ -292,7 +314,7 @@ export default function AdminView({
 
           <div className="hidden print:block text-center space-y-1 mb-6">
             <h2 className="text-xl font-bold">รายงานสรุปยอดการจองรถตู้พนักงาน</h2>
-            <p className="text-sm text-slate-500">ประจำวันที่: {selectedOverviewDate || 'ทุกวันทั้งหมดในระบบ'} | กะ: {selectedShiftTypeFilter === 'ALL' ? 'ทั้งหมด' : selectedShiftTypeFilter}</p>
+            <p className="text-sm text-slate-500">ประจำวันที่: {formatThaiDate(selectedOverviewDate) || 'ทุกวันทั้งหมดในระบบ'} | กะ: {selectedShiftTypeFilter === 'ALL' ? 'ทั้งหมด' : selectedShiftTypeFilter}</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 print:hidden">
@@ -308,21 +330,21 @@ export default function AdminView({
               {routesList.map((route) => {
                 const routeBookings = filteredBookingsByDate.filter(b => {
                   const matchRoute = b.route === route.name;
-                  const matchShift = !route.shift || b.shiftType === route.shift || b.shift === route.shift;
+                  const matchShift = !route.shiftType || route.shiftType === 'All' || b.shiftType === route.shiftType || b.shift === route.shiftType;
                   return matchRoute && matchShift;
                 });
                 
                 return (
                   <div key={route.id} className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm space-y-3">
-                    <div className="flex justify-between items-start border-b pb-3">
+                    <div className="flex justify-between items-start border-b border-slate-200 dark:border-slate-800 pb-3">
                       <div>
                         <div className="flex items-center gap-2">
                           <h4 className="font-extrabold text-blue-600 dark:text-blue-400 text-base">{route.name}</h4>
-                          <span className={`text-[10px] px-2 py-0.5 rounded font-bold border ${route.shift === 'Shift' ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900' : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900'}`}>
-                            {route.shift || 'Day'}
+                          <span className={`text-[10px] px-2 py-0.5 rounded font-bold border ${route.shiftType === 'Shift' ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900' : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900'}`}>
+                            {route.shiftType || route.shift || 'Day'}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-400 mt-1">ทะเบียน: {route.plate || '-'} | คนขับ: {route.driver || '-'} ({route.phone || '-'})</p>
+                        <p className="text-xs text-slate-400 mt-1">ทะเบียน: {route.plate || route.vanPlate || '-'} | คนขับ: {route.driver || route.driverName || '-'} ({route.phone || '-'})</p>
                       </div>
                       <span className="bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-black text-xs px-2.5 py-1 rounded-xl">
                         {routeBookings.length} คน
@@ -350,7 +372,7 @@ export default function AdminView({
                                     </span>
                                   )}
                                 </div>
-                                <span className="block text-[11px] text-slate-400">จุดรับ: {b.pickupLocation} ({b.time} น.)</span>
+                                <span className="block text-[11px] text-slate-400">จุดรับ: {b.pickupLocation} ({b.time} น.) | เดินทาง: {formatThaiDate(b.travelDate)}</span>
                               </div>
                               <span className="font-mono text-xs font-semibold text-slate-600 dark:text-slate-300 mt-0.5">{b.employeePhone || '-'}</span>
                             </div>
@@ -366,18 +388,18 @@ export default function AdminView({
         </div>
       )}
 
+      {/* 2. ROUTES TAB */}
       {adminTab === 'routes' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-1 p-5 bg-white dark:bg-slate-900 border rounded-2xl shadow-sm border-slate-200 dark:border-slate-800 h-fit space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-black text-slate-500 uppercase tracking-wider">{editingRouteId ? '✏️ แก้ไขข้อมูลสายรถ' : '➕ สร้างและเพิ่มสายรถคันใหม่'}</h3>
               {editingRouteId && (
-                <button type="button" onClick={handleCancelEdit} className="text-xs text-slate-400 hover:text-slate-600 font-bold">ยกเลิกแก้ไข</button>
+                <button type="button" onClick={handleCancelEdit} className="text-xs text-slate-400 hover:text-slate-600 font-bold cursor-pointer">ยกเลิกแก้ไข</button>
               )}
             </div>
             <form onSubmit={handleSaveRoute} className="space-y-3 text-xs">
               
-              {/* ปุ่มเลือกเปลี่ยนเป็น Day / Shift */}
               <div>
                 <label className="block text-slate-400 font-bold mb-1">เลือกกะการทำงานสายรถ</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -414,55 +436,59 @@ export default function AdminView({
               <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-2">
                 <label className="block text-slate-400 font-bold">กำหนดจุดจอดรับ ส่งพนักงาน</label>
                 <div className="flex gap-2">
-                  <input type="text" placeholder="ชื่อสถานีรายทาง" value={stationInput} onChange={e => setStationInput(e.target.value)} className="w-full border p-2 rounded-xl dark:bg-slate-950" />
-                  <input type="text" placeholder="เวลา (06.30)" value={timeInput} onChange={e => setTimeInput(e.target.value)} className="w-28 border p-2 rounded-xl dark:bg-slate-950" />
-                  <button type="button" onClick={handleAddStop} className="bg-slate-200 dark:bg-slate-800 px-3 py-2 rounded-xl font-bold whitespace-nowrap">+ เพิ่มจุดจอด</button>
+                  <input type="text" placeholder="ชื่อสถานีรายทาง" value={stationInput} onChange={e => setStationInput(e.target.value)} className="w-full border border-slate-200 dark:border-slate-800 p-2 rounded-xl dark:bg-slate-950" />
+                  <input type="text" placeholder="เวลา (06.30)" value={timeInput} onChange={e => setTimeInput(e.target.value)} className="w-28 border border-slate-200 dark:border-slate-800 p-2 rounded-xl dark:bg-slate-950" />
+                  <button type="button" onClick={handleAddStop} className="bg-slate-200 dark:bg-slate-800 px-3 py-2 rounded-xl font-bold whitespace-nowrap cursor-pointer">+ เพิ่มจุดจอด</button>
                 </div>
                 {stopsList.length > 0 && (
                   <div className="space-y-1 mt-2">
                     {stopsList.map((st, idx) => (
-                      <div key={idx} className="flex justify-between items-center bg-slate-50 dark:bg-slate-950 p-2 rounded-lg border text-[11px]">
+                      <div key={idx} className="flex justify-between items-center bg-slate-50 dark:bg-slate-950 p-2 rounded-lg border border-slate-200 dark:border-slate-800 text-[11px]">
                         <span>จุดที่ {idx + 1}: {st.station} ({st.time} น.)</span>
-                        <button type="button" onClick={() => handleRemoveStop(idx)} className="text-red-500 font-bold px-1.5">✕</button>
+                        <button type="button" onClick={() => handleRemoveStop(idx)} className="text-red-500 font-bold px-1.5 cursor-pointer">✕</button>
                       </div>
                     ))}
                   </div>
                 )}
               </div>
 
-              <button type="submit" className={`w-full font-bold py-2.5 rounded-xl transition-all shadow ${editingRouteId ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}>
+              <button type="submit" className={`w-full font-bold py-2.5 rounded-xl transition-all shadow cursor-pointer ${editingRouteId ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}>
                 {editingRouteId ? 'บันทึกการแก้ไขสายรถ' : 'บันทึกสายรถเข้าสู่ระบบ'}
               </button>
             </form>
           </div>
           <div className="md:col-span-2 space-y-3">
             <h3 className="text-xs font-black text-slate-500 uppercase tracking-wider">เส้นทางรถตู้ทั้งหมดในฐานข้อมูลองค์กร</h3>
-            {routesList.map(r => (
-              <div key={r.id} className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex justify-between items-start gap-4 shadow-sm">
-                <div className="space-y-2">
-                  <h4 className="font-bold text-slate-900 dark:text-white text-sm">
-                    {r.name} 
-                    <span className="ml-2 inline-block bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 text-[10px] px-2 py-0.5 rounded font-bold border border-blue-100 dark:border-blue-900">{r.shift || 'Day'}</span>
-                    <span className="block text-slate-400 font-normal text-xs font-mono mt-0.5">ทะเบียน: {r.plate || '-'} · คนขับ: {r.driver || '-'} ({r.phone || '-'})</span>
-                  </h4>
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    {r.stops?.map((stop: any, sIdx: number) => (
-                      <div key={sIdx} className="bg-slate-100 dark:bg-slate-950 px-2.5 py-1 rounded-md border text-[11px] text-slate-600 dark:text-slate-300">
-                        จุดที่ {sIdx + 1}: {stop.station} <span className="font-mono text-blue-600">{stop.time} น.</span>
-                      </div>
-                    )) || <span className="text-xs text-slate-400">ยังไม่ได้ระบุจุดจอดรถ</span>}
+            {routesList.map(r => {
+              const currentStops = r.stops || r.stations || [];
+              return (
+                <div key={r.id} className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex justify-between items-start gap-4 shadow-sm">
+                  <div className="space-y-2">
+                    <h4 className="font-bold text-slate-900 dark:text-white text-sm">
+                      {r.name} 
+                      <span className="ml-2 inline-block bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 text-[10px] px-2 py-0.5 rounded font-bold border border-blue-100 dark:border-blue-900">{r.shiftType || r.shift || 'Day'}</span>
+                      <span className="block text-slate-400 font-normal text-xs font-mono mt-0.5">ทะเบียน: {r.plate || r.vanPlate || '-'} · คนขับ: {r.driver || r.driverName || '-'} ({r.phone || '-'})</span>
+                    </h4>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {currentStops.map((stop: any, sIdx: number) => (
+                        <div key={sIdx} className="bg-slate-100 dark:bg-slate-950 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-300">
+                          จุดที่ {sIdx + 1}: {stop.stationName || stop.station} <span className="font-mono text-blue-600">{stop.arrivalTime || stop.time} น.</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 whitespace-nowrap">
+                    <button onClick={() => handleEditRouteClick(r)} className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer">แก้ไข</button>
+                    <button onClick={() => handleDeleteRoute(r.id)} className="text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer">ถอดถอนสายรถนี้</button>
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 whitespace-nowrap">
-                  <button onClick={() => handleEditRouteClick(r)} className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 text-xs px-2.5 py-1.5 rounded-lg font-bold">แก้ไข</button>
-                  <button onClick={() => handleDeleteRoute(r.id)} className="text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 text-xs px-2.5 py-1.5 rounded-lg font-bold">ถอดถอนสายรถนี้</button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
 
+      {/* 3. ANNOUNCEMENTS TAB */}
       {adminTab === 'announcements' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-1 p-5 bg-white dark:bg-slate-900 border rounded-2xl shadow-sm border-slate-200 dark:border-slate-800 h-fit space-y-4">
@@ -470,21 +496,22 @@ export default function AdminView({
             <form onSubmit={handleAddAnnouncement} className="space-y-3 text-xs">
               <div><label className="block text-slate-400 font-bold mb-1">หัวข้อประกาศข่าว</label><input type="text" placeholder="หัวเรื่อง..." value={newAnnounceTitle} onChange={e => setNewAnnounceTitle(e.target.value)} className="w-full border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl dark:bg-slate-950 focus:outline-none focus:border-blue-500" required /></div>
               <div><label className="block text-slate-400 font-bold mb-1">เนื้อหาประกาศ</label><textarea placeholder="รายละเอียด..." value={newAnnounceContent} onChange={e => setNewAnnounceContent(e.target.value)} className="w-full border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl h-32 dark:bg-slate-950 focus:outline-none focus:border-blue-500" required /></div>
-              <button type="submit" className="w-full bg-slate-900 hover:bg-black text-white font-bold py-2.5 rounded-xl dark:bg-blue-600 dark:hover:bg-blue-700 transition-all shadow">โพสต์ประกาศบนระบบ</button>
+              <button type="submit" className="w-full bg-slate-900 hover:bg-black text-white font-bold py-2.5 rounded-xl dark:bg-blue-600 dark:hover:bg-blue-700 transition-all shadow cursor-pointer">โพสต์ประกาศบนระบบ</button>
             </form>
           </div>
           <div className="md:col-span-2 space-y-3">
             <h3 className="text-xs font-black text-slate-500 uppercase tracking-wider">📄 ประวัติและรายการประกาศข่าวสารประชาสัมพันธ์</h3>
             {announcementsList.map(a => (
               <div key={a.id} className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex justify-between items-start gap-4 shadow-sm">
-                <div className="space-y-1"><h4 className="font-bold text-slate-900 dark:text-white">{a.title}</h4><p className="text-xs text-slate-500 leading-relaxed">{a.content}</p><span className="block text-[10px] text-slate-400 font-mono">เมื่อ: {a.timestamp ? new Date(a.timestamp).toLocaleString('th-TH') : ''}</span></div>
-                <button onClick={() => handleDeleteAnnouncement(a.id)} className="text-red-500 hover:bg-red-50 text-xs px-2.5 py-1.5 rounded-lg font-bold">ลบ</button>
+                <div className="space-y-1"><h4 className="font-bold text-slate-900 dark:text-white">{a.title}</h4><p className="text-xs text-slate-500 dark:text-slate-300 leading-relaxed">{a.desc || a.content}</p><span className="block text-[10px] text-slate-400 font-mono">เมื่อ: {a.timestamp ? new Date(a.timestamp).toLocaleString('th-TH') : ''}</span></div>
+                <button onClick={() => handleDeleteAnnouncement(a.id)} className="text-red-500 hover:bg-red-50 text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer">ลบ</button>
               </div>
             ))}
           </div>
         </div>
       )}
 
+      {/* 4. TICKETS TAB */}
       {adminTab === 'tickets' && (
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
@@ -493,28 +520,28 @@ export default function AdminView({
           </div>
 
           <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-xl w-fit border border-slate-200 dark:border-slate-800/60">
-            <button onClick={() => setTicketSubTab('Pending')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${ticketSubTab === 'Pending' ? 'bg-white dark:bg-slate-900 text-amber-600 shadow-sm' : 'text-slate-500'}`}>🔴 รอดำเนินการ ({pendingTicketsCount})</button>
-            <button onClick={() => setTicketSubTab('Processing')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${ticketSubTab === 'Processing' ? 'bg-white dark:bg-slate-900 text-blue-600 shadow-sm' : 'text-slate-500'}`}>🟡 กำลังตรวจสอบ ({processingTicketsCount})</button>
-            <button onClick={() => setTicketSubTab('Resolved')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${ticketSubTab === 'Resolved' ? 'bg-white dark:bg-slate-900 text-emerald-600 shadow-sm' : 'text-slate-500'}`}>🟢 แก้ไขเรียบร้อย ({resolvedTicketsCount})</button>
+            <button onClick={() => setTicketSubTab('Pending')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${ticketSubTab === 'Pending' ? 'bg-white dark:bg-slate-900 text-amber-600 shadow-sm' : 'text-slate-500'}`}>🔴 รอดำเนินการ ({pendingTicketsCount})</button>
+            <button onClick={() => setTicketSubTab('Processing')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${ticketSubTab === 'Processing' ? 'bg-white dark:bg-slate-900 text-blue-600 shadow-sm' : 'text-slate-500'}`}>🟡 กำลังตรวจสอบ ({processingTicketsCount})</button>
+            <button onClick={() => setTicketSubTab('Resolved')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${ticketSubTab === 'Resolved' ? 'bg-white dark:bg-slate-900 text-emerald-600 shadow-sm' : 'text-slate-500'}`}>🟢 แก้ไขเรียบร้อย ({resolvedTicketsCount})</button>
           </div>
 
           <div className="grid grid-cols-1 gap-4">
             {filteredTickets.length === 0 ? (
-              <div className="p-12 border border-dashed rounded-2xl text-center text-slate-400">📭 ไม่มีรายการแจ้งปัญหาในหมวดหมู่นี้</div>
+              <div className="p-12 border border-dashed rounded-2xl text-center text-slate-400 border-slate-200 dark:border-slate-800">📭 ไม่มีรายการแจ้งปัญหาในหมวดหมู่นี้</div>
             ) : (
               filteredTickets.map((ticket) => {
                 const isResolved = ticket.status === 'Resolved';
                 return (
-                  <div key={ticket.id} className={`p-5 rounded-2xl border bg-white dark:bg-slate-900 shadow-sm space-y-4 ${isResolved ? 'opacity-80' : ''}`}>
-                    <div className="flex justify-between items-start gap-4 border-b pb-2">
+                  <div key={ticket.id} className={`p-5 rounded-2xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm space-y-4 ${isResolved ? 'opacity-80' : ''}`}>
+                    <div className="flex justify-between items-start gap-4 border-b border-slate-200 dark:border-slate-800 pb-2">
                       <div>
                         <span className="text-[9px] text-slate-400 font-mono block">ID: {ticket.id}</span>
                         <h4 className="font-bold text-base">📌 เรื่อง: {ticket.subject}</h4>
                         <p className="text-xs text-slate-500">ผู้ส่ง: <strong className="text-slate-700 dark:text-slate-200">{ticket.employeeEmail}</strong></p>
                       </div>
                       <div className="flex items-center gap-2">
-                        {isResolved && <button onClick={() => handleArchiveTicket(ticket.id)} className="bg-red-50 text-red-600 text-xs px-3 py-1.5 rounded-md font-bold">📦 จัดเก็บแชท</button>}
-                        <select value={ticket.status} onChange={(e) => handleUpdateTicketStatus(ticket.id, e.target.value)} className="text-xs font-bold px-2.5 py-1 rounded-md border">
+                        {isResolved && <button onClick={() => handleArchiveTicket(ticket.id)} className="bg-red-50 text-red-600 text-xs px-3 py-1.5 rounded-md font-bold cursor-pointer">📦 จัดเก็บแชท</button>}
+                        <select value={ticket.status} onChange={(e) => handleUpdateTicketStatus(ticket.id, e.target.value)} className="text-xs font-bold px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 cursor-pointer">
                           <option value="Pending">🔴 รอดำเนินการ</option>
                           <option value="Processing">🟡 กำลังตรวจสอบ</option>
                           <option value="Resolved">🟢 แก้ไขเรียบร้อย</option>
@@ -525,14 +552,14 @@ export default function AdminView({
                       {ticket.messages?.map((msg: any, mIdx: number) => (
                         <div key={mIdx} className={`flex flex-col ${msg.sender === 'admin' ? 'items-end' : 'items-start'}`}>
                           <span className="text-[9px] text-slate-400 mb-0.5">{msg.sender === 'admin' ? 'คุณ (แอดมิน)' : 'พนักงาน'}</span>
-                          <div className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-xs ${msg.sender === 'admin' ? 'bg-slate-900 text-white dark:bg-blue-600 rounded-tr-none' : 'bg-white dark:bg-slate-800 rounded-tl-none border'}`}>{msg.text}</div>
+                          <div className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-xs ${msg.sender === 'admin' ? 'bg-slate-900 text-white dark:bg-blue-600 rounded-tr-none' : 'bg-white dark:bg-slate-800 rounded-tl-none border border-slate-200 dark:border-slate-700'}`}>{msg.text}</div>
                         </div>
                       ))}
                     </div>
                     {!isResolved && (
                       <div className="flex gap-2">
-                        <input type="text" placeholder="พิมพ์ข้อความตอบกลับ..." value={replyMessages[ticket.id] || ''} onChange={(e) => setReplyMessages(prev => ({ ...prev, [ticket.id]: e.target.value }))} className="w-full border p-2.5 rounded-xl text-xs dark:bg-slate-950" />
-                        <button onClick={() => handleReplyTicketChat(ticket.id)} className="bg-blue-600 text-white px-5 rounded-xl text-xs font-bold">ส่งแชท</button>
+                        <input type="text" placeholder="พิมพ์ข้อความตอบกลับ..." value={replyMessages[ticket.id] || ''} onChange={(e) => setReplyMessages(prev => ({ ...prev, [ticket.id]: e.target.value }))} className="w-full border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl text-xs dark:bg-slate-950" />
+                        <button onClick={() => handleReplyTicketChat(ticket.id)} className="bg-blue-600 hover:bg-blue-700 text-white px-5 rounded-xl text-xs font-bold cursor-pointer">ส่งแชท</button>
                       </div>
                     )}
                   </div>
@@ -543,6 +570,7 @@ export default function AdminView({
         </div>
       )}
 
+      {/* 5. CANCELLATION TAB */}
       {adminTab === 'cancellation' && (
         <div className="space-y-4">
           <div className="flex justify-between items-center">
@@ -552,21 +580,21 @@ export default function AdminView({
 
           <div className="grid grid-cols-1 gap-4">
             {combinedCancelRequests.length === 0 ? (
-              <div className="p-12 border border-dashed rounded-2xl text-center text-slate-400">📭 ไม่มีคำขอยกเลิกตั๋วในขณะนี้</div>
+              <div className="p-12 border border-dashed rounded-2xl text-center text-slate-400 border-slate-200 dark:border-slate-800">📭 ไม่มีคำขอยกเลิกตั๋วในขณะนี้</div>
             ) : (
               combinedCancelRequests.map((req) => (
                 <div key={req.id} className="p-5 rounded-2xl border border-red-200 bg-white dark:bg-slate-900 shadow-sm space-y-4">
-                  <div className="flex justify-between items-start gap-4 border-b pb-2">
+                  <div className="flex justify-between items-start gap-4 border-b border-slate-200 dark:border-slate-800 pb-2">
                     <div>
                       <span className="text-[9px] text-slate-400 font-mono block">รหัส: {req.id}</span>
                       <h4 className="font-bold text-base">🎫 คำขอยกเลิก: สาย {req.route || req.subject || '-'}</h4>
                       <p className="text-xs text-slate-500">พนักงาน: <strong>{req.employeeName || req.employeeEmail}</strong></p>
                     </div>
-                    <button onClick={() => handleApproveCancellation(req.id, req.bookingId)} className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md">🗑️ อนุมัติลบตั๋วออกจากระบบ</button>
+                    <button onClick={() => handleApproveCancellation(req.id, req.bookingId)} className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md cursor-pointer">🗑️ อนุมัติลบตั๋วออกจากระบบ</button>
                   </div>
                   <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl space-y-1">
                     <span className="text-[10px] font-bold text-slate-400 uppercase">เหตุผลที่ระบุ:</span>
-                    <p className="text-xs bg-white dark:bg-slate-900 p-3 rounded-lg border">{req.reason || req.message || 'ไม่ได้ระบุเหตุผล'}</p>
+                    <p className="text-xs bg-white dark:bg-slate-900 p-3 rounded-lg border border-slate-200 dark:border-slate-800">{req.reason || req.message || 'ไม่ได้ระบุเหตุผล'}</p>
                   </div>
                 </div>
               ))
