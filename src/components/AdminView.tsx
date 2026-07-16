@@ -30,6 +30,8 @@ export default function AdminView({
   const [adminTab, setAdminTab] = useState<'overview' | 'routes' | 'announcements' | 'tickets' | 'cancellation'>('overview');
   const [ticketSubTab, setTicketSubTab] = useState<'Pending' | 'Processing' | 'Resolved'>('Pending');
 
+  const [adminRouteFilter, setAdminRouteFilter] = useState<'Day' | 'Shift'>('Day');
+
   const getTodayDateString = () => {
     const today = new Date();
     const yyyy = today.getFullYear();
@@ -71,6 +73,13 @@ export default function AdminView({
   const cancelRequestsCount = combinedCancelRequests.length;
 
   const filteredTickets = supportTicketsList.filter(t => t.status === ticketSubTab);
+
+  const filteredAdminRoutes = routesList.filter(r => {
+    if (!r.shiftType && !r.shift) return adminRouteFilter === 'Day';
+    const type = r.shiftType || r.shift;
+    if (type === 'All') return adminRouteFilter === 'Day';
+    return type === adminRouteFilter;
+  });
 
   const formatThaiDate = (dateStr: string) => {
     if (!dateStr) return '';
@@ -120,11 +129,11 @@ export default function AdminView({
       const routeData = {
         name: newRouteName,
         plate: newRoutePlate,
-        vanPlate: newRoutePlate, // รองรับทั้งสองฟิลด์ฝั่ง user/admin
+        vanPlate: newRoutePlate,
         driver: newRouteDriver,
         driverName: newRouteDriver,
         phone: newRoutePhone,
-        shiftType: newRouteShift, // บันทึกประเภทกะ (Day หรือ Shift) ให้ตรงกับ UserView
+        shiftType: newRouteShift,
         shift: newRouteShift,
         stops: stopsList,
         stations: stopsList,
@@ -260,13 +269,13 @@ export default function AdminView({
   return (
     <div className="text-sm text-slate-800 dark:text-slate-100 max-w-6xl mx-auto space-y-6">
       
-      {/* Navigation Tabs */}
+      {/* Navigation Tabs - ครบทั้ง 5 แท็บ */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 gap-2 overflow-x-auto pb-px print:hidden">
         <button onClick={() => setAdminTab('overview')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap cursor-pointer ${adminTab === 'overview' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>📊 สรุปภาพรวมการจอง</button>
         <button onClick={() => setAdminTab('routes')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap cursor-pointer ${adminTab === 'routes' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>🚌 จัดการสายรถตู้ ({routesList.length})</button>
         <button onClick={() => setAdminTab('announcements')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap cursor-pointer ${adminTab === 'announcements' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>📢 จัดการประกาศข่าว ({announcementsList.length})</button>
         <button onClick={() => setAdminTab('tickets')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${adminTab === 'tickets' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>📬 กล่องข้อความแจ้งปัญหา {pendingTicketsCount > 0 && (<span className="bg-red-500 text-white text-[10px] h-4 px-1.5 rounded-full flex items-center justify-center font-bold animate-pulse">{pendingTicketsCount}</span>)}</button>
-        <button onClick={() => setAdminTab('cancellation')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${adminTab === 'cancellation' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>❌ คำขอยกเลิกตั๋ว {cancelRequestsCount > 0 && (<span className="bg-amber-500 text-white text-[10px] h-4 px-1.5 rounded-full flex items-center justify-center font-bold">{cancelRequestsCount}</span>)}</button>
+        <button onClick={() => setAdminTab('cancellation')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${adminTab === 'cancellation' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>❌ คำขอยกเลิกการจอง {cancelRequestsCount > 0 && (<span className="bg-amber-500 text-white text-[10px] h-4 px-1.5 rounded-full flex items-center justify-center font-bold">{cancelRequestsCount}</span>)}</button>
       </div>
 
       {/* 1. OVERVIEW TAB */}
@@ -340,7 +349,7 @@ export default function AdminView({
                       <div>
                         <div className="flex items-center gap-2">
                           <h4 className="font-extrabold text-blue-600 dark:text-blue-400 text-base">{route.name}</h4>
-                          <span className={`text-[10px] px-2 py-0.5 rounded font-bold border ${route.shiftType === 'Shift' ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900' : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900'}`}>
+                          <span className={`text-[10px] px-2 py-0.5 rounded font-bold border ${(route.shiftType || route.shift) === 'Shift' ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900' : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900'}`}>
                             {route.shiftType || route.shift || 'Day'}
                           </span>
                         </div>
@@ -390,8 +399,8 @@ export default function AdminView({
 
       {/* 2. ROUTES TAB */}
       {adminTab === 'routes' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-1 p-5 bg-white dark:bg-slate-900 border rounded-2xl shadow-sm border-slate-200 dark:border-slate-800 h-fit space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+          <div className="md:col-span-5 p-5 bg-white dark:bg-slate-900 border rounded-2xl shadow-sm border-slate-200 dark:border-slate-800 h-fit space-y-4">
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-black text-slate-500 uppercase tracking-wider">{editingRouteId ? '✏️ แก้ไขข้อมูลสายรถ' : '➕ สร้างและเพิ่มสายรถคันใหม่'}</h3>
               {editingRouteId && (
@@ -419,7 +428,7 @@ export default function AdminView({
                     onClick={() => setNewRouteShift('Shift')}
                     className={`p-2.5 rounded-xl border font-bold transition-all cursor-pointer ${
                       newRouteShift === 'Shift' 
-                        ? 'bg-blue-600 border-blue-600 text-white shadow-md' 
+                        ? 'bg-purple-600 border-purple-600 text-white shadow-md' 
                         : 'border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
                     }`}
                   >
@@ -457,33 +466,62 @@ export default function AdminView({
               </button>
             </form>
           </div>
-          <div className="md:col-span-2 space-y-3">
-            <h3 className="text-xs font-black text-slate-500 uppercase tracking-wider">เส้นทางรถตู้ทั้งหมดในฐานข้อมูลองค์กร</h3>
-            {routesList.map(r => {
-              const currentStops = r.stops || r.stations || [];
-              return (
-                <div key={r.id} className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex justify-between items-start gap-4 shadow-sm">
-                  <div className="space-y-2">
-                    <h4 className="font-bold text-slate-900 dark:text-white text-sm">
-                      {r.name} 
-                      <span className="ml-2 inline-block bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 text-[10px] px-2 py-0.5 rounded font-bold border border-blue-100 dark:border-blue-900">{r.shiftType || r.shift || 'Day'}</span>
-                      <span className="block text-slate-400 font-normal text-xs font-mono mt-0.5">ทะเบียน: {r.plate || r.vanPlate || '-'} · คนขับ: {r.driver || r.driverName || '-'} ({r.phone || '-'})</span>
-                    </h4>
-                    <div className="flex flex-wrap gap-2 pt-1">
-                      {currentStops.map((stop: any, sIdx: number) => (
-                        <div key={sIdx} className="bg-slate-100 dark:bg-slate-950 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-300">
-                          จุดที่ {sIdx + 1}: {stop.stationName || stop.station} <span className="font-mono text-blue-600">{stop.arrivalTime || stop.time} น.</span>
+
+          <div className="md:col-span-7 space-y-4">
+            <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+              <span className="font-extrabold text-xs text-slate-600 dark:text-slate-300">📌 เลือกดูสายรถตามกะ:</span>
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => setAdminRouteFilter('Day')}
+                  className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${adminRouteFilter === 'Day' ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}
+                >
+                  ☀️ กะ Day ({routesList.filter(r => !r.shiftType && !r.shift || r.shiftType === 'Day' || r.shift === 'Day' || r.shiftType === 'All').length})
+                </button>
+                <button 
+                  onClick={() => setAdminRouteFilter('Shift')}
+                  className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${adminRouteFilter === 'Shift' ? 'bg-purple-600 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}
+                >
+                  🌙 กะ Shift ({routesList.filter(r => r.shiftType === 'Shift' || r.shift === 'Shift').length})
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {filteredAdminRoutes.length > 0 ? (
+                filteredAdminRoutes.map(r => {
+                  const currentStops = r.stops || r.stations || [];
+                  const isShift = (r.shiftType || r.shift) === 'Shift';
+                  return (
+                    <div key={r.id} className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex justify-between items-start gap-4 shadow-sm">
+                      <div className="space-y-2">
+                        <h4 className="font-bold text-slate-900 dark:text-white text-sm">
+                          {r.name} 
+                          <span className={`ml-2 inline-block text-[10px] px-2 py-0.5 rounded font-bold border ${isShift ? 'bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900' : 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900'}`}>
+                            {r.shiftType || r.shift || 'Day'}
+                          </span>
+                          <span className="block text-slate-400 font-normal text-xs font-mono mt-0.5">ทะเบียน: {r.plate || r.vanPlate || '-'} · คนขับ: {r.driver || r.driverName || '-'} ({r.phone || '-'})</span>
+                        </h4>
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          {currentStops.map((stop: any, sIdx: number) => (
+                            <div key={sIdx} className="bg-slate-100 dark:bg-slate-950 px-2.5 py-1 rounded-md border border-slate-200 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-300">
+                              จุดที่ {sIdx + 1}: {stop.stationName || stop.station} <span className="font-mono text-blue-600">{stop.arrivalTime || stop.time} น.</span>
+                            </div>
+                          ))}
                         </div>
-                      ))}
+                      </div>
+                      <div className="flex items-center gap-1.5 whitespace-nowrap">
+                        <button onClick={() => handleEditRouteClick(r)} className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer">แก้ไข</button>
+                        <button onClick={() => handleDeleteRoute(r.id)} className="text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer">ถอดถอนสายรถนี้</button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 whitespace-nowrap">
-                    <button onClick={() => handleEditRouteClick(r)} className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer">แก้ไข</button>
-                    <button onClick={() => handleDeleteRoute(r.id)} className="text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer">ถอดถอนสายรถนี้</button>
-                  </div>
+                  );
+                })
+              ) : (
+                <div className="text-center py-16 bg-white dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-slate-400">
+                  ไม่พบข้อมูลสายรถในหมวดหมู่ <span className="font-bold text-slate-600 dark:text-slate-300">({adminRouteFilter})</span>
                 </div>
-              );
-            })}
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { collection, addDoc } from 'firebase/firestore';
+import React, { useState, useEffect } from 'react';
+import { collection, addDoc, doc, onSnapshot, updateDoc, arrayUnion, deleteDoc } from 'firebase/firestore';
 
 interface UserViewProps {
   db: any;
@@ -40,7 +40,6 @@ export default function UserView({
   const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   
-  // State สำหรับกรองประวัติการจอง
   const [historyFilterDate, setHistoryFilterDate] = useState('');
   const [historyFilterRoute, setHistoryFilterRoute] = useState('');
   
@@ -53,15 +52,33 @@ export default function UserView({
   };
 
   const [selectedSummaryDate, setSelectedSummaryDate] = useState(getTodayDateString());
-  const [, setActiveChatTicketId] = useState<string | null>(null);
+  const [activeChatTicketId, setActiveChatTicketId] = useState<string | null>(null);
+  const [activeTicketData, setActiveTicketData] = useState<any>(null);
+  const [replyMessage, setReplyMessage] = useState('');
 
-  // State สำหรับระบบกะและการจองรถตู้
+  // กรอง Support Tickets เฉพาะของ User คนนี้
+  const myTickets = supportTicketsList.filter(t => t.employeeEmail === (user?.email || 'employee@company.com'));
+
+  useEffect(() => {
+    if (!activeChatTicketId) {
+      setActiveTicketData(null);
+      return;
+    }
+    
+    const unsubscribe = onSnapshot(doc(db, 'support_tickets', activeChatTicketId), (docSnap) => {
+      if (docSnap.exists()) {
+        setActiveTicketData({ id: docSnap.id, ...docSnap.data() });
+      }
+    });
+
+    return () => unsubscribe();
+  }, [activeChatTicketId, db]);
+
   const [shiftType, setShiftType] = useState<'Day' | 'Shift'>('Day');
   const [shiftTimeSlot, setShiftTimeSlot] = useState<string>('08:00 - 17:00');
   const [employeeName, setEmployeeName] = useState('');
   const [employeePhone, setEmployeePhone] = useState('');
   
-  // กรองสายรถตามกะที่เลือก (รองรับ field shiftType ของสายรถ เช่น 'Day', 'Shift' หรือถ้าไม่ระบุให้ถือว่าใช้ได้ทุกกะ)
   const filteredRoutesList = routesList.filter(r => {
     if (!r.shiftType || r.shiftType === 'All' || r.shiftType === ' ทุกกะ') return true;
     return r.shiftType === shiftType;
@@ -94,9 +111,15 @@ export default function UserView({
   };
 
   const currentActiveRoute = filteredRoutesList.find(r => r.id === selectedRouteId) || filteredRoutesList[0] || routesList[0];
+  
   const getRouteStations = (route: any) => {
     if (!route) return [];
-    return route.stops || route.stations || [];
+    const rawStops = route.stops || route.stations || [];
+    return rawStops.map((st: any, index: number) => ({
+      index: index + 1,
+      name: st.stationName || st.station || st.name || 'ไม่ระบุชื่อสถานี',
+      time: st.arrivalTime || st.time || '00:00'
+    }));
   };
 
   const checkCutoffTimeAndAdjustDate = (inputDate: string) => {
@@ -104,7 +127,7 @@ export default function UserView({
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
     const currentTimeInMinutes = currentHour * 60 + currentMinute;
-    const cutoffTimeInMinutes = 15 * 60; // 15.00 น.
+    const cutoffTimeInMinutes = 15 * 60;
 
     if (inputDate === getTodayDateString() && currentTimeInMinutes >= cutoffTimeInMinutes) {
       const tomorrow = new Date();
@@ -142,6 +165,26 @@ export default function UserView({
       showAlert('error', 'เกิดข้อผิดพลาด', 'ไม่สามารถสร้างรายการแจ้งปัญหาได้');
     } finally {
       setIsSubmittingTicket(false);
+    }
+  };
+
+  const handleSendReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!replyMessage.trim() || !activeChatTicketId) return;
+
+    try {
+      const ticketRef = doc(db, 'support_tickets', activeChatTicketId);
+      await updateDoc(ticketRef, {
+        messages: arrayUnion({
+          sender: 'user',
+          text: replyMessage,
+          timestamp: new Date().toISOString()
+        }),
+        status: 'Pending'
+      });
+      setReplyMessage('');
+    } catch {
+      showAlert('error', 'เกิดข้อผิดพลาด', 'ไม่สามารถส่งข้อความได้');
     }
   };
 
@@ -192,6 +235,90 @@ export default function UserView({
             )}
           </div>
 
+          {/* รายการแจ้งปัญหา / แชทของฉัน */}
+          <div className="space-y-4 pt-4">
+            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
+              <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">กล่องข้อความช่วยเหลือของฉัน (Support Tickets)</h3>
+              <span className="text-[11px] text-slate-400 font-bold">ทั้งหมด {myTickets.length} รายการ</span>
+            </div>
+
+            {myTickets.length > 0 ? (
+              <div className="grid grid-cols-1 gap-3">
+                {myTickets.map(t => {
+                  const lastMsg = t.messages?.[t.messages.length - 1];
+                  const isAdminReply = lastMsg?.sender === 'admin';
+                  const isResolved = t.status === 'Resolved';
+
+                  return (
+                    <div 
+                      key={t.id} 
+                      className={`p-4 rounded-xl border bg-white dark:bg-slate-900 shadow-sm transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 ${isAdminReply && !isResolved ? 'border-blue-500 ring-1 ring-blue-500 bg-blue-50/20' : 'border-slate-200 dark:border-slate-800'}`}
+                    >
+                      <div 
+                        onClick={() => setActiveChatTicketId(t.id)}
+                        className="space-y-1 flex-1 cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-slate-900 dark:text-white text-xs">📌 เรื่อง: {t.subject}</span>
+                          {isAdminReply && !isResolved && (
+                            <span className="bg-blue-600 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">
+                              ✨ แอดมินตอบกลับแล้ว
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-500 truncate max-w-md">
+                          {lastMsg ? `${lastMsg.sender === 'admin' ? 'แอดมิน: ' : 'คุณ: '}${lastMsg.text}` : 'ยังไม่มีข้อความ'}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-3 self-end md:self-auto">
+                        <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${isResolved ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                          {isResolved ? '🟢 แก้ไขเรียบร้อย' : '🟡 กำลังตรวจสอบ'}
+                        </span>
+                        
+                        <button 
+                          onClick={() => setActiveChatTicketId(t.id)}
+                          className="text-xs font-bold text-blue-600 hover:underline cursor-pointer"
+                        >
+                          เปิดแชท →
+                        </button>
+
+                        {/* ปุ่มลบ จะแสดงก็ต่อเมื่อสถานะเป็น Resolved แล้วเท่านั้น */}
+                        {isResolved && (
+                          <button
+                            onClick={async () => {
+                              showAlert(
+                                'warning',
+                                'ยืนยันการลบรายการ',
+                                'คุณต้องการลบประวัติการแจ้งปัญหานี้ใช่หรือไม่?',
+                                async () => {
+                                  try {
+                                    await deleteDoc(doc(db, 'support_tickets', t.id));
+                                    showAlert('success', 'ลบสำเร็จ', 'ลบรายการแจ้งปัญหาเรียบร้อยแล้ว');
+                                  } catch {
+                                    showAlert('error', 'เกิดข้อผิดพลาด', 'ไม่สามารถลบรายการได้');
+                                  }
+                                },
+                                true
+                              );
+                            }}
+                            className="bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all cursor-pointer"
+                          >
+                            🗑️ ลบ
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-6 text-center border border-dashed rounded-xl text-slate-400 dark:border-slate-800 text-xs">
+                ยังไม่มีประวัติการแจ้งเรื่องหรือติดต่อแอดมิน
+              </div>
+            )}
+          </div>
+
           <div className="space-y-4 pt-4">
             <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
               <h3 className="text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">HELP & SUPPORT (ติดต่อ/แจ้งปัญหาถึงแอดมิน)</h3>
@@ -234,7 +361,7 @@ export default function UserView({
         </div>
       )}
 
-      {/* 2. BOOKING TAB (ระบบสำรองที่นั่งเลือกกะ Day/Shift รองรับหลายวัน และกรองสายรถตามกะอัตโนมัติ) */}
+      {/* 2. BOOKING TAB */}
       {activeMenu === 'booking' && (
         <div className="max-w-md mx-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-2xl text-slate-800 dark:text-white">
           <div className="bg-slate-950 text-white p-5 text-center border-b border-slate-800">
@@ -251,7 +378,6 @@ export default function UserView({
           </div>
 
           <div className="p-6 space-y-4">
-            {/* ขั้นตอนที่ 1: เลือกประเภทกะ และช่วงเวลา + เลือกสายรถที่กรองแล้ว */}
             {bookingStep === 1 && (
               <div className="space-y-4">
                 <div className="space-y-3">
@@ -263,7 +389,6 @@ export default function UserView({
                       onClick={() => {
                         setShiftType('Day');
                         setShiftTimeSlot('08:00 - 17:00');
-                        // รีเซ็ตค่าสายรถไปที่ตัวแรกของกะ Day ที่กรองได้
                         const newFiltered = routesList.filter(r => !r.shiftType || r.shiftType === 'All' || r.shiftType === 'Day');
                         if (newFiltered.length > 0) {
                           setSelectedRouteId(newFiltered[0].id);
@@ -281,7 +406,6 @@ export default function UserView({
                       onClick={() => {
                         setShiftType('Shift');
                         setShiftTimeSlot('06:00 - 18:30');
-                        // รีเซ็ตค่าสายรถไปที่ตัวแรกของกะ Shift ที่กรองได้
                         const newFiltered = routesList.filter(r => !r.shiftType || r.shiftType === 'All' || r.shiftType === 'Shift');
                         if (newFiltered.length > 0) {
                           setSelectedRouteId(newFiltered[0].id);
@@ -381,7 +505,6 @@ export default function UserView({
               </div>
             )}
 
-            {/* ขั้นตอนที่ 2: กรอกข้อมูลส่วนตัว, จุดขึ้นรถ, วันที่เดินทาง */}
             {bookingStep === 2 && (
               <div className="space-y-4">
                 <div className="p-4 bg-blue-50/30 dark:bg-slate-950 rounded-xl border border-blue-100 dark:border-slate-800 space-y-3">
@@ -416,13 +539,15 @@ export default function UserView({
                     className="w-full border border-slate-200 dark:border-slate-800 dark:bg-slate-950 p-2.5 rounded-xl text-slate-900 dark:text-white font-semibold focus:outline-none focus:border-blue-500 text-xs"
                   >
                     {activeStations.map((st: any, i: number) => (
-                      <option key={i} value={i} className="dark:bg-slate-950">สถานี: {st.stationName || st.name} ({st.arrivalTime || st.time} น.)</option>
+                      <option key={i} value={i} className="dark:bg-slate-950">
+                        จุดที่ {st.index}: {st.name} ({st.time} น.)
+                      </option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-black uppercase text-slate-400 tracking-wider mb-1.5">ระบุวันที่ต้องการเดินทาง (เพิ่มได้หลายวัน)</label>
+                  <label className="block text-[11px] font-black uppercase text-slate-400 tracking-wider mb-1.5">ระบุวันที่ต้องจองรถ (เพิ่มได้หลายวัน)</label>
                   <div className="flex gap-2">
                     <input 
                       type="date" 
@@ -484,7 +609,7 @@ export default function UserView({
                   <button 
                     onClick={() => {
                       if (!travelDate) {
-                        showAlert('warning', 'ยังไม่ได้เลือกวันที่', 'กรุณาเพิ่มวันที่ต้องการเดินทางอย่างน้อย 1 วัน');
+                        showAlert('warning', 'ยังไม่ได้เลือกวันที่', 'กรุณาเพิ่มวันที่ต้องจองรถอย่างน้อย 1 วัน');
                         return;
                       }
                       setBookingStep(3);
@@ -497,17 +622,28 @@ export default function UserView({
               </div>
             )}
 
-            {/* ขั้นตอนที่ 3: สรุปข้อมูลก่อนกดยืนยัน */}
             {bookingStep === 3 && (
               <div className="space-y-4">
-                <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2 text-xs">
+                <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3 text-xs">
                   <span className="block font-black uppercase text-blue-600 dark:text-blue-400 mb-2">🔍 สรุปข้อมูลการสำรองที่นั่ง</span>
-                  <p><strong>ประเภทกะ:</strong> {shiftType === 'Day' ? '☀️ กะ Day' : '🌙 กะ Shift'} ({shiftTimeSlot})</p>
-                  <p><strong>เส้นทาง:</strong> {selectedRouteName}</p>
-                  <p><strong>ชื่อพนักงาน:</strong> {employeeName}</p>
-                  <p><strong>เบอร์โทร:</strong> {employeePhone}</p>
-                  <p><strong>จุดขึ้นรถ:</strong> {activeStations[selectedStationIndex]?.stationName || activeStations[selectedStationIndex]?.name} ({activeStations[selectedStationIndex]?.arrivalTime || activeStations[selectedStationIndex]?.time} น.)</p>
-                  <p><strong>วันที่เดินทางทั้งหมด:</strong> {travelDate}</p>
+                  <div className="space-y-1.5">
+                    <p><strong>ประเภทกะ:</strong> {shiftType === 'Day' ? '☀️ กะ Day' : '🌙 กะ Shift'} ({shiftTimeSlot})</p>
+                    <p><strong>เส้นทาง:</strong> {selectedRouteName}</p>
+                    <p><strong>ชื่อพนักงาน:</strong> {employeeName}</p>
+                    <p><strong>เบอร์โทร:</strong> {employeePhone}</p>
+                    <p><strong>จุดขึ้นรถ:</strong> จุดที่ {activeStations[selectedStationIndex]?.index}: {activeStations[selectedStationIndex]?.name} ({activeStations[selectedStationIndex]?.time} น.)</p>
+                  </div>
+                  
+                  <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-1.5">
+                    <strong className="block text-slate-700 dark:text-slate-300">📅 วันที่จองรถทั้งหมด:</strong>
+                    <div className="grid grid-cols-2 gap-1.5 max-h-32 overflow-y-auto pr-1">
+                      {travelDate.split(',').map((d: string, idx: number) => (
+                        <div key={idx} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-2.5 py-1.5 rounded-lg text-center font-mono font-bold text-blue-600 dark:text-blue-400 shadow-2xs">
+                          {d.trim()}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 <div className="flex gap-2 pt-2">
@@ -539,8 +675,8 @@ export default function UserView({
                             employeeName, 
                             employeePhone,
                             route: selectedRouteName, 
-                            pickupLocation: targetStation?.stationName || targetStation?.name || 'ไม่ระบุ', 
-                            time: targetStation?.arrivalTime || targetStation?.time || 'ไม่ระบุ',
+                            pickupLocation: `จุดที่ ${targetStation?.index}: ${targetStation?.name}`, 
+                            time: targetStation?.time || 'ไม่ระบุ',
                             driverName: currentActiveRoute.driver || currentActiveRoute.driverName || 'ไม่ระบุ', 
                             vanPlate: currentActiveRoute.plate || currentActiveRoute.vanPlate || 'ไม่ระบุ',
                             travelDate: adjustedDate, 
@@ -567,10 +703,15 @@ export default function UserView({
                           });
                         }
 
-                        showAlert('success', 'สำรองที่นั่งสำเร็จทุกวัน', 'ระบบบันทึกรายการจองตามวันที่คุณเลือกทั้งหมดเรียบร้อย', () => {
-                          setActiveMenu('qrcode');
-                          setBookingStep(1);
-                        });
+                        showAlert(
+                          'success', 
+                          'จองรถสำเร็จ!', 
+                          'ระบบบันทึกรายการจองของคุณเรียบร้อยแล้ว สามารถตรวจเช็คข้อมูลได้ที่หน้าประวัติ', 
+                          () => {
+                            setActiveMenu('history');
+                            setBookingStep(1);
+                          }
+                        );
                       } catch {
                         showAlert('error', 'เกิดข้อผิดพลาด', 'ระบบขัดข้องในการเชื่อมต่อฐานข้อมูล');
                       } finally { 
@@ -763,6 +904,60 @@ export default function UserView({
             >
               ปิดหน้าต่าง
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 6. CHAT MODAL (หน้าต่างแชทโต้ตอบกับแอดมิน) */}
+      {activeChatTicketId && activeTicketData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col h-[500px]">
+            
+            <div className="p-4 bg-slate-900 text-white rounded-t-2xl flex justify-between items-center">
+              <div>
+                <h4 className="font-bold text-xs">💬 แชทกับเจ้าหน้าที่: {activeTicketData.subject}</h4>
+                <span className="text-[10px] text-slate-400">สถานะ: {activeTicketData.status}</span>
+              </div>
+              <button 
+                onClick={() => setActiveChatTicketId(null)}
+                className="text-slate-400 hover:text-white font-bold text-sm cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50 dark:bg-slate-950">
+              {activeTicketData.messages?.map((msg: any, idx: number) => {
+                const isUser = msg.sender === 'user';
+                return (
+                  <div key={idx} className={`flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
+                    <div className={`max-w-[80%] p-3 rounded-2xl text-xs ${isUser ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-700 rounded-bl-none'}`}>
+                      <p>{msg.text}</p>
+                    </div>
+                    <span className="text-[9px] text-slate-400 mt-1 px-1">
+                      {isUser ? 'คุณ' : 'แอดมิน'} · {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <form onSubmit={handleSendReply} className="p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex gap-2">
+              <input 
+                type="text" 
+                placeholder="พิมพ์ข้อความตอบกลับ..." 
+                value={replyMessage}
+                onChange={(e) => setReplyMessage(e.target.value)}
+                className="flex-1 border border-slate-200 dark:border-slate-700 dark:bg-slate-950 p-2.5 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+              />
+              <button 
+                type="submit" 
+                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold cursor-pointer"
+              >
+                ส่ง
+              </button>
+            </form>
+
           </div>
         </div>
       )}
