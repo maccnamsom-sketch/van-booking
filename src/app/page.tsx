@@ -19,17 +19,14 @@ export default function EnterpriseVanBookingSystem() {
   const [activeMenu, setActiveMenu] = useState<'home' | 'booking' | 'history' | 'qrcode' | 'admin' | 'shiftRequest'>('home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  // ตรวจสอบสิทธิ์ว่าเป็นแอดมินหรือไม่
   const isAdmin = user?.email === 'admin@company.com';
 
-  // เด้งกลับหน้าหลักอัตโนมัติถ้าเข้าเมนูแอดมินโดยไม่มีสิทธิ์
   useEffect(() => {
     if (user && !isAdmin && activeMenu === 'admin') {
       setActiveMenu('home');
     }
   }, [activeMenu, user, isAdmin]);
 
-  // Modal alert state
   const [modalAlert, setModalAlert] = useState<{
     isOpen: boolean; type: 'success' | 'warning' | 'error' | 'info'; title: string; message: string; onConfirm?: () => void; showCancel?: boolean;
   }>({ isOpen: false, type: 'info', title: '', message: '' });
@@ -38,7 +35,6 @@ export default function EnterpriseVanBookingSystem() {
     setModalAlert({ isOpen: true, type, title, message, onConfirm, showCancel });
   };
 
-  // Live Data States
   const [routesList, setRoutesList] = useState<any[]>([]);
   const [bookingsList, setBookingsList] = useState<any[]>([]);
   const [announcementsList, setAnnouncementsList] = useState<any[]>([]);
@@ -46,13 +42,11 @@ export default function EnterpriseVanBookingSystem() {
   const [adHocRequestsList, setAdHocRequestsList] = useState<any[]>([]);
   const [recentBooking, setRecentBooking] = useState<any>(null);
 
-  // Login Form States
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  // 1. useEffect สำหรับเช็ก Auth State เสมอ
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
@@ -61,9 +55,8 @@ export default function EnterpriseVanBookingSystem() {
     return () => unsubscribeAuth();
   }, []);
 
-  // 2. useEffect สำหรับ Subscribe Firestore Data (ทำงานเฉพาะตอนที่มี user ล็อกอินแล้วเท่านั้น!)
   useEffect(() => {
-    if (!user) return; // 🛑 ป้องกัน Permission Denied: ถ้ายังไม่ได้ล็อกอิน จะไม่สั่งรัน Listener ดึงข้อมูล
+    if (!user) return;
 
     const unsubscribeRoutes = onSnapshot(query(collection(db, 'van_routes')), (snapshot) => {
       setRoutesList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -113,13 +106,13 @@ export default function EnterpriseVanBookingSystem() {
 
   if (loading) return <div className="flex min-h-screen items-center justify-center bg-slate-950 text-white text-xs">Loading...</div>;
 
-  // 🎨 ส่วนหน้าจอ Login (Split Screen)
+  // 🎨 ส่วนหน้าจอ Login ใหม่ (ปรับเพิ่ม Mobile First Responsive)
   if (!user) {
     return (
-      <div className="flex min-h-screen w-full bg-slate-100 p-4 md:p-8 items-center justify-center">
-        <div className="flex w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl border border-slate-100">
+      <div className="flex min-h-screen w-full items-center justify-center bg-slate-100 p-4 sm:p-6 md:p-8">
+        <div className="flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl sm:rounded-3xl bg-white shadow-xl sm:shadow-2xl border border-slate-200/80 md:flex-row">
           
-          {/* 🔷 ฝั่งซ้าย: Gradient สีองค์กร */}
+          {/* 🔷 ฝั่งซ้าย: แสดงในคอมพิวเตอร์ (Desktop View) */}
           <div className="hidden w-1/2 flex-col justify-between bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 p-10 text-white md:flex">
             <div className="flex items-center gap-2.5 font-bold tracking-wider text-blue-400">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/20 text-blue-400 border border-blue-400/30">
@@ -145,12 +138,25 @@ export default function EnterpriseVanBookingSystem() {
             </div>
           </div>
 
-          {/* ⬜ ฝั่งขวา: ฟอร์ม Login */}
-          <div className="flex w-full flex-col justify-center p-8 md:w-1/2 md:p-12">
-            <div className="mb-6 space-y-1">
-              <h2 className="text-xl font-bold text-slate-900">เข้าสู่ระบบ</h2>
+          {/* 📱 แถบ Header โลโก้เพิ่มเติมสำหรับมือถือ (Mobile Header Bar) */}
+          <div className="flex items-center justify-between bg-gradient-to-r from-slate-900 to-blue-950 px-6 py-5 text-white md:hidden">
+            <div className="flex items-center gap-2.5 font-bold tracking-wider">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/20 text-blue-400 border border-blue-400/30">
+                <Bus className="h-4 w-4" />
+              </div>
+              <span className="text-sm font-black text-white">AEROFLEX</span>
+            </div>
+            <span className="text-[10px] font-medium text-slate-300 bg-slate-800/80 px-2.5 py-1 rounded-full border border-slate-700">
+              Van Booking
+            </span>
+          </div>
+
+          {/* ⬜ ฝั่งขวา: ฟอร์ม Login (รองรับจอทุกขนาด) */}
+          <div className="flex w-full flex-col justify-center p-6 sm:p-8 md:w-1/2 md:p-12">
+            <div className="mb-6 space-y-1 text-center md:text-left">
+              <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900">เข้าสู่ระบบ</h2>
               <p className="text-xs text-slate-500">
-                กรุณากรอกข้อมูลบัญชีพนักงานเพื่อเข้าสู่ระบบ
+                ระบบจองรถตู้พนักงาน บริษัท แอร์โรเฟลกซ์ จำกัด
               </p>
             </div>
 
@@ -185,7 +191,7 @@ export default function EnterpriseVanBookingSystem() {
                     placeholder="name@company.com" 
                     value={email} 
                     onChange={(e) => setEmail(e.target.value)} 
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-3 text-xs text-slate-900 outline-none transition focus:border-slate-900 focus:bg-white focus:ring-1 focus:ring-slate-900" 
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-3 md:py-2.5 pl-10 pr-3 text-xs text-slate-900 outline-none transition focus:border-slate-900 focus:bg-white focus:ring-1 focus:ring-slate-900" 
                     required 
                   />
                 </div>
@@ -200,7 +206,7 @@ export default function EnterpriseVanBookingSystem() {
                     placeholder="••••••••" 
                     value={password} 
                     onChange={(e) => setPassword(e.target.value)} 
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-3 text-xs text-slate-900 outline-none transition focus:border-slate-900 focus:bg-white focus:ring-1 focus:ring-slate-900" 
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-3 md:py-2.5 pl-10 pr-3 text-xs text-slate-900 outline-none transition focus:border-slate-900 focus:bg-white focus:ring-1 focus:ring-slate-900" 
                     required 
                   />
                 </div>
@@ -208,7 +214,7 @@ export default function EnterpriseVanBookingSystem() {
 
               <button 
                 type="submit" 
-                className="w-full rounded-xl bg-slate-900 py-3 text-xs font-bold text-white shadow-md transition hover:bg-slate-800 active:scale-[0.98] disabled:opacity-50" 
+                className="w-full rounded-xl bg-slate-900 py-3.5 md:py-3 text-xs font-bold text-white shadow-md transition hover:bg-slate-800 active:scale-[0.98] disabled:opacity-50 mt-2" 
                 disabled={isLoggingIn}
               >
                 {isLoggingIn ? 'กำลังตรวจสอบ...' : 'เข้าสู่ระบบ'}
@@ -216,7 +222,7 @@ export default function EnterpriseVanBookingSystem() {
             </form>
 
             <div className="mt-8 text-center text-[11px] text-slate-400">
-              พบปัญหาการใช้งาน ติดต่อ <span className="font-semibold text-slate-600 underline cursor-pointer">Admin</span>
+              พบปัญหาการใช้งาน ติดต่อ <span className="font-semibold text-slate-600 underline cursor-pointer">IT Support</span>
             </div>
           </div>
 
