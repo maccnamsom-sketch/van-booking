@@ -19,156 +19,6 @@ interface UserViewProps {
   systemConfig?: any;
 }
 
-// 🌐 Dictionary สำหรับสลับภาษา TH / EN
-const translations = {
-  th: {
-    systemClosed: 'ขณะนี้ระบบปิดรับการจองรถตู้ชั่วคราว',
-    checkDailyName: 'ตรวจสอบรายชื่อผู้เดินทางประจำวัน',
-    hubTitle: 'ระบบจองรถตู้พนักงานบริษัท แอร์โรเฟลกซ์ จำกัด',
-    hubSub: 'ระบบสารสนเทศสำหรับการตรวจสอบข้อมูลเดินรถ ตารางเวลาสถานีรับส่ง และลงทะเบียนเพื่อสำรองที่นั่งพนักงานส่วนกลางขององค์กร (ตัดรอบจองเวลา 15.00 น.)',
-    announcements: 'ประกาศสำคัญจากฝ่ายธุรการ',
-    noAnnouncements: 'ไม่มีประกาศใหม่ในขณะนี้',
-    myTickets: 'กล่องข้อความช่วยเหลือของฉัน',
-    totalItems: 'ทั้งหมด',
-    items: 'รายการ',
-    contactAdmin: 'ติดต่อ / แจ้งปัญหาถึงแอดมิน',
-    contactDesc: 'พบปัญหาการใช้งาน แจ้งยกเลิกรอบรถ หรือติดต่อเจ้าหน้าที่ กรุณากรอกหัวข้อเพื่อเปิดเคสและเริ่มสนทนา',
-    ticketSubject: 'หัวข้อเรื่อง',
-    ticketSubjectPlaceholder: 'เช่น ลืมของบนรถสาย 1',
-    ticketDetail: 'รายละเอียด',
-    ticketDetailPlaceholder: 'อธิบายรายละเอียดปัญหาของคุณ...',
-    startChat: 'เริ่มแชท',
-    submitting: 'กำลังเปิด...',
-    noTickets: 'ยังไม่มีประวัติการแจ้งเรื่องหรือติดต่อแอดมิน',
-    seatReservation: 'ระบบสำรองสิทธิ์เดินทาง',
-    cutoffNotice: 'ตัดรอบจองเวลา 15:00 น. ของทุกวัน',
-    step1: 'เลือกกะและสายรถ',
-    step2: 'กรอกข้อมูลและจุดขึ้นรถ',
-    step3: 'ตรวจสอบและยืนยัน',
-    shiftDay: 'กะ Day',
-    shiftShift: 'กะ Shift',
-    workTimeDay: 'เข้างาน 08:00 น. / เลิกงาน 17:00 น.',
-    selectShiftSlot: 'เลือกช่วงเวลากะ Shift:',
-    vanRoutes: 'เลือกสายรถตู้สวัสดิการ',
-    tripType: 'เลือกประเภทการเดินทาง',
-    roundTrip: 'ไป-กลับ (ทั้งขามาและขากลับ)',
-    inboundOnly: 'เฉพาะขามา (ขาไปอย่างเดียว)',
-    outboundOnly: 'เฉพาะขากลับอย่างเดียว',
-    nextStep: 'ขั้นตอนถัดไป (กรอกข้อมูลส่วนตัว & จุดขึ้นรถ) →',
-    contactInfo: 'ข้อมูลติดต่อสำหรับคนขับ',
-    empName: 'ชื่อ - นามสกุล พนักงาน',
-    empPhone: 'เบอร์โทรศัพท์',
-    selectStation: 'สถานีจุดจอดรับและตารางเวลา',
-    selectDates: 'ระบุวันที่ต้องการจอง (เลือกได้หลายวัน)',
-    addDate: 'เพิ่มวัน',
-    selectedDates: 'วันที่เลือกไว้แล้ว:',
-    back: 'ย้อนกลับ',
-    checkData: 'ตรวจสอบข้อมูล →',
-    summaryTitle: 'สรุปข้อมูลการสำรองที่นั่ง',
-    confirmBooking: 'ยืนยันสำรองสิทธิ์',
-    saving: 'กำลังบันทึก...',
-    shiftRequestTitle: 'แจ้งขอเปลี่ยนกะ / ออกก่อนเวลา (Ad-hoc Request)',
-    shiftRequestSub: 'ใช้สำหรับกรณีมีเหตุจำเป็นต้องออกก่อนเวลากะปกติที่ระบบตั้งไว้ เพื่อให้แอดมินอนุมัติและปรับบันทึกเวลา',
-    selectPrevBooking: 'เลือกจากประวัติการจองของคุณ (ถ้ามี)',
-    optSelectBooking: '-- เลือกรายการจองเดิมเพื่อดึงข้อมูล -- (ไม่บังคับ)',
-    reqDate: '1. เลือกวันที่ต้องการเปลี่ยนเวลา',
-    reqOriginal: '2. กะเวลาปกติในระบบ',
-    reqNewTime: '3. เวลาที่ขอออกจริง (เช่น ขอออกเร็วขึ้น)',
-    reqReason: '4. เหตุผลความจำเป็น',
-    submitReq: 'ส่งคำขอให้แอดมินอนุมัติ',
-    submittingReq: 'กำลังส่งคำขอ...',
-    reqHistory: 'ประวัติและสถานะคำขอเปลี่ยนกะของคุณ',
-    noReqHistory: 'คุณยังไม่มีประวัติการส่งคำขอเปลี่ยนกะ',
-    historyTitle: 'ประวัติการจอง',
-    filterByDate: 'กรองตามวันที่เดินทาง',
-    filterByRoute: 'กรองตามสายรถ',
-    allRoutes: 'ทุกสายรถ',
-    viewQr: 'ดู QR Code',
-    confirmed: 'ยืนยันแล้ว',
-    noHistory: 'ไม่พบประวัติการจองตามเงื่อนไขที่เลือก',
-    checkinPass: 'คิวอาร์โค้ดสำหรับเช็คอินขึ้นรถ',
-    qrDesc: 'แสดงคิวอาร์โค้ดนี้ให้คนขับรถสแกนเมื่อถึงจุดรับ',
-    noQr: 'ยังไม่มีข้อมูลการจองล่าสุด กรุณาทำรายการจองก่อนครับ',
-    dailyListTitle: 'รายชื่อพนักงานเดินทางวันที่',
-    close: 'ปิดหน้าต่าง',
-    openStatus: 'เปิดรับจอง',
-    closeStatus: 'ปิดรับจอง',
-  },
-  en: {
-    systemClosed: 'The booking system is currently closed.',
-    checkDailyName: 'Check Daily Passengers List',
-    hubTitle: 'Aeroflex Employee Shuttle Van Booking System',
-    hubSub: 'Central van booking portal for schedules, station stops, and seat reservations (Cut-off time 15:00 daily)',
-    announcements: 'Important Announcements',
-    noAnnouncements: 'No new announcements at this time.',
-    myTickets: 'My Support Tickets',
-    totalItems: 'Total',
-    items: 'items',
-    contactAdmin: 'Contact / Report Issue to Admin',
-    contactDesc: 'Encountered issues, need to cancel trips, or need support? Fill in the subject to start a chat.',
-    ticketSubject: 'Subject',
-    ticketSubjectPlaceholder: 'e.g., Forgot item on Route 1',
-    ticketDetail: 'Details',
-    ticketDetailPlaceholder: 'Describe your issue...',
-    startChat: 'Start Chat',
-    submitting: 'Opening...',
-    noTickets: 'No support tickets found.',
-    seatReservation: 'Van Seat Reservation',
-    cutoffNotice: 'Daily Cut-off time at 15:00',
-    step1: 'Shift & Route',
-    step2: 'Info & Pickup',
-    step3: 'Review & Confirm',
-    shiftDay: 'Day Shift',
-    shiftShift: 'Rotation Shift',
-    workTimeDay: 'Work: 08:00 - 17:00',
-    selectShiftSlot: 'Select Shift Time Slot:',
-    vanRoutes: 'Select Van Route',
-    tripType: 'Select Trip Type',
-    roundTrip: 'Round Trip (Both ways)',
-    inboundOnly: 'Inbound Only (To Company)',
-    outboundOnly: 'Outbound Only (To Home)',
-    nextStep: 'Next Step (Personal Info & Pickup) →',
-    contactInfo: 'Driver Contact Information',
-    empName: 'Employee Full Name',
-    empPhone: 'Phone Number',
-    selectStation: 'Pickup Station & Schedule',
-    selectDates: 'Select Booking Dates (Multiple dates allowed)',
-    addDate: 'Add Date',
-    selectedDates: 'Selected Dates:',
-    back: 'Back',
-    checkData: 'Review Information →',
-    summaryTitle: 'Booking Confirmation Summary',
-    confirmBooking: 'Confirm Reservation',
-    saving: 'Saving...',
-    shiftRequestTitle: 'Shift Change / Early Departure Request',
-    shiftRequestSub: 'Request early leave or shift adjustment for admin approval.',
-    selectPrevBooking: 'Select from previous bookings (Optional)',
-    optSelectBooking: '-- Select booking to autofill -- (Optional)',
-    reqDate: '1. Select Request Date',
-    reqOriginal: '2. Regular Shift Time',
-    reqNewTime: '3. Requested Departure Time',
-    reqReason: '4. Reason for Request',
-    submitReq: 'Submit Request',
-    submittingReq: 'Submitting...',
-    reqHistory: 'Shift Request History & Status',
-    noReqHistory: 'No shift requests found.',
-    historyTitle: 'Booking History',
-    filterByDate: 'Filter by Travel Date',
-    filterByRoute: 'Filter by Route',
-    allRoutes: 'All Routes',
-    viewQr: 'View QR Code',
-    confirmed: 'Confirmed',
-    noHistory: 'No booking history matching the filter.',
-    checkinPass: 'Check-in Boarding Pass',
-    qrDesc: 'Show this QR code to the driver for scanning.',
-    noQr: 'No recent booking found. Please complete a reservation first.',
-    dailyListTitle: 'Passenger List for Date',
-    close: 'Close Window',
-    openStatus: 'OPEN',
-    closeStatus: 'CLOSED',
-  }
-};
-
 export default function UserView({ 
   db, 
   user, 
@@ -184,9 +34,6 @@ export default function UserView({
   supportTicketsList,
   systemConfig
 }: UserViewProps) {
-  // 🌐 Language State (th / en)
-  const [lang, setLang] = useState<'th' | 'en'>('th');
-  const t = translations[lang];
 
   // ⏰ Real-time Clock State
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
@@ -290,7 +137,7 @@ export default function UserView({
   };
 
   const isSystemOpen = checkIsBookingOpen();
-  const closeReasonMessage = liveConfig?.closeReason || (lang === 'th' ? 'ระบบปิดรับการจองชั่วคราวโดยผู้ดูแลระบบ' : 'The system is temporarily closed by administrator.');
+  const closeReasonMessage = liveConfig?.closeReason || 'ระบบปิดรับการจองชั่วคราวโดยผู้ดูแลระบบ';
 
   useEffect(() => {
     if (user) {
@@ -389,7 +236,7 @@ export default function UserView({
     if (!dateStr) return '';
     const parts = dateStr.split('-');
     if (parts.length !== 3) return dateStr;
-    const yyyy = parseInt(parts[0], 10) + (lang === 'th' ? 543 : 0);
+    const yyyy = parseInt(parts[0], 10) + 543;
     const mm = parts[1];
     const dd = parts[2];
     return `${dd}/${mm}/${yyyy}`;
@@ -426,7 +273,7 @@ export default function UserView({
   const handleSendTicket = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!ticketSubject || !ticketFirstMessage) {
-      showAlert('warning', lang === 'th' ? 'กรุณากรอกข้อมูลให้ครบถ้วน' : 'Missing Information', lang === 'th' ? 'ต้องระบุเรื่องและรายละเอียดเริ่มต้น' : 'Please provide both subject and message.');
+      showAlert('warning', 'กรุณากรอกข้อมูลให้ครบถ้วน', 'ต้องระบุเรื่องและรายละเอียดเริ่มต้น');
       return;
     }
 
@@ -440,12 +287,12 @@ export default function UserView({
         messages: [{ sender: 'user', text: ticketFirstMessage, timestamp: new Date().toISOString() }]
       });
 
-      showAlert('success', lang === 'th' ? 'เปิดฟอร์มแจ้งเรื่องเรียบร้อย' : 'Ticket Created', lang === 'th' ? 'คุณสามารถแตะเพื่อคุยรายละเอียดเพิ่มเติมได้ทันที' : 'You can now chat with support.');
+      showAlert('success', 'เปิดฟอร์มแจ้งเรื่องเรียบร้อย', 'คุณสามารถแตะเพื่อคุยรายละเอียดเพิ่มเติมได้ทันที');
       setTicketSubject('');
       setTicketFirstMessage('');
       setActiveChatTicketId(docRef.id);
     } catch {
-      showAlert('error', lang === 'th' ? 'เกิดข้อผิดพลาด' : 'Error', lang === 'th' ? 'ไม่สามารถสร้างรายการแจ้งปัญหาได้' : 'Failed to create ticket.');
+      showAlert('error', 'เกิดข้อผิดพลาด', 'ไม่สามารถสร้างรายการแจ้งปัญหาได้');
     } finally {
       setIsSubmittingTicket(false);
     }
@@ -467,14 +314,14 @@ export default function UserView({
       });
       setReplyMessage('');
     } catch {
-      showAlert('error', 'Error', 'Cannot send reply');
+      showAlert('error', 'ข้อผิดพลาด', 'ไม่สามารถส่งข้อความได้');
     }
   };
 
   const handleSubmitShiftRequest = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!shiftReqDate || !shiftReqNewTime || !shiftReqReason) {
-      showAlert('warning', lang === 'th' ? 'กรอกข้อมูลไม่ครบถ้วน' : 'Incomplete Form', lang === 'th' ? 'กรุณาระบุวันที่ เวลาที่ต้องการออก และเหตุผลความจำเป็น' : 'Please fill all required fields.');
+      showAlert('warning', 'กรอกข้อมูลไม่ครบถ้วน', 'กรุณาระบุวันที่ เวลาที่ต้องการออก และเหตุผลความจำเป็น');
       return;
     }
 
@@ -491,11 +338,11 @@ export default function UserView({
         timestamp: new Date().toISOString()
       });
 
-      showAlert('success', lang === 'th' ? 'ส่งคำขอสำเร็จ' : 'Request Submitted', lang === 'th' ? 'ระบบได้ส่งคำขอเปลี่ยนกะ/ออกก่อนเวลาให้แอดมินพิจารณาแล้ว' : 'Your shift request has been submitted.');
+      showAlert('success', 'ส่งคำขอสำเร็จ', 'ระบบได้ส่งคำขอเปลี่ยนกะ/ออกก่อนเวลาให้แอดมินพิจารณาแล้ว');
       setShiftReqReason('');
       setSelectedBookingId('');
     } catch {
-      showAlert('error', 'Error', 'Failed to submit shift request');
+      showAlert('error', 'ข้อผิดพลาด', 'ไม่สามารถส่งคำขอเปลี่ยนกะได้');
     } finally {
       setIsSubmittingShiftReq(false);
     }
@@ -506,12 +353,11 @@ export default function UserView({
   return (
     <div className="text-sm text-slate-800 dark:text-slate-100">
       
-      {/* 🟢 TOP BAR: REALTIME CLOCK & LANGUAGE SWITCHER (REDESIGN) */}
+      {/* 🟢 TOP BAR: REALTIME CLOCK & STATUS */}
       <div className="max-w-4xl mx-auto mb-5 px-4 py-2.5 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-xs flex items-center justify-between gap-3 transition-all">
         
-        {/* Left Section: Live Clock & Status */}
+        {/* Live Status Indicator & Clock */}
         <div className="flex items-center gap-2.5 flex-wrap">
-          {/* Live Status Indicator */}
           <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide border transition-all ${
             isSystemOpen 
               ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/50' 
@@ -521,7 +367,7 @@ export default function UserView({
               <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isSystemOpen ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
               <span className={`relative inline-flex rounded-full h-2 w-2 ${isSystemOpen ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
             </span>
-            <span>{isSystemOpen ? t.openStatus : t.closeStatus}</span>
+            <span>{isSystemOpen ? 'เปิดรับจอง' : 'ปิดรับจอง'}</span>
           </div>
 
           <div className="h-3.5 w-[1px] bg-slate-200 dark:bg-slate-800 hidden sm:block"></div>
@@ -532,39 +378,11 @@ export default function UserView({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <span>
-              {currentTime ? currentTime.toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '---'}
+              {currentTime ? currentTime.toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '---'}
             </span>
             <span className="font-mono font-bold text-slate-800 dark:text-slate-100 bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-200/60 dark:border-slate-700/60 text-[11px]">
               {currentTime ? currentTime.toLocaleTimeString('en-US', { hour12: false }) : '00:00:00'}
             </span>
-          </div>
-        </div>
-
-        {/* Right Section: Modern Language Switcher */}
-        <div className="flex items-center gap-1.5">
-          <div className="bg-slate-100 dark:bg-slate-800/80 p-0.5 rounded-xl border border-slate-200/70 dark:border-slate-700/70 flex items-center">
-            <button 
-              type="button"
-              onClick={() => setLang('th')} 
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                lang === 'th' 
-                  ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs' 
-                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-              }`}
-            >
-              <span>TH</span>
-            </button>
-            <button 
-              type="button"
-              onClick={() => setLang('en')} 
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                lang === 'en' 
-                  ? 'bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 shadow-xs' 
-                  : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
-              }`}
-            >
-              <span>EN</span>
-            </button>
           </div>
         </div>
 
@@ -579,7 +397,7 @@ export default function UserView({
             <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-2xl text-rose-700 dark:text-rose-300 flex items-center gap-3 shadow-sm animate-pulse">
               <span className="text-2xl">🔒</span>
               <div>
-                <h4 className="font-bold text-sm">{t.systemClosed}</h4>
+                <h4 className="font-bold text-sm">ขณะนี้ระบบปิดรับการจองรถตู้ชั่วคราว</h4>
                 <p className="text-xs opacity-90">{closeReasonMessage}</p>
               </div>
             </div>
@@ -593,17 +411,17 @@ export default function UserView({
                   onClick={() => setShowSummaryModal(true)}
                   className="bg-emerald-600/90 hover:bg-emerald-600 text-white text-[11px] font-medium px-3.5 py-1.5 rounded-full transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
                 >
-                  {t.checkDailyName} ({bookingsList.filter(b => b.travelDate === todayStr).length})
+                  ตรวจสอบรายชื่อผู้เดินทางประจำวัน ({bookingsList.filter(b => b.travelDate === todayStr).length})
                 </button>
               </div>
-              <h2 className="text-xl md:text-2xl font-bold tracking-tight text-white">{t.hubTitle}</h2>
-              <p className="text-xs text-slate-300 font-normal leading-relaxed">{t.hubSub}</p>
+              <h2 className="text-xl md:text-2xl font-bold tracking-tight text-white">ระบบจองรถตู้พนักงานบริษัท แอร์โรเฟลกซ์ จำกัด</h2>
+              <p className="text-xs text-slate-300 font-normal leading-relaxed">ระบบสารสนเทศสำหรับการตรวจสอบข้อมูลเดินรถ ตารางเวลาสถานีรับส่ง และลงทะเบียนเพื่อสำรองที่นั่งพนักงานส่วนกลางขององค์กร (ตัดรอบจองเวลา 15.00 น.)</p>
             </div>
           </div>
 
           <div className="space-y-4">
             <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
-              <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t.announcements}</h3>
+              <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">ประกาศสำคัญจากฝ่ายธุรการ</h3>
             </div>
             {announcementsList.length > 0 ? (
               <div className="grid grid-cols-1 gap-4">
@@ -612,7 +430,7 @@ export default function UserView({
                     <div className="flex justify-between items-start gap-4">
                       <h4 className="font-bold text-sm text-slate-900 dark:text-white">{a.title}</h4>
                       <span className="text-[11px] text-slate-500 font-medium bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-md border border-slate-200/60 dark:border-slate-700">
-                        {new Date(a.timestamp).toLocaleDateString(lang === 'th' ? 'th-TH' : 'en-US')}
+                        {new Date(a.timestamp).toLocaleDateString('th-TH')}
                       </span>
                     </div>
                     {a.desc && <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{a.desc}</p>}
@@ -620,14 +438,14 @@ export default function UserView({
                 ))}
               </div>
             ) : (
-              <div className="text-center py-12 border border-dashed rounded-xl text-slate-400 dark:text-slate-500 dark:border-slate-800 text-xs">{t.noAnnouncements}</div>
+              <div className="text-center py-12 border border-dashed rounded-xl text-slate-400 dark:text-slate-500 dark:border-slate-800 text-xs">ไม่มีประกาศใหม่ในขณะนี้</div>
             )}
           </div>
 
           <div className="space-y-4 pt-4">
             <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
-              <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t.myTickets}</h3>
-              <span className="text-[11px] text-slate-400">{t.totalItems} {myTickets.length} {t.items}</span>
+              <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">กล่องข้อความช่วยเหลือของฉัน</h3>
+              <span className="text-[11px] text-slate-400">ทั้งหมด {myTickets.length} รายการ</span>
             </div>
 
             {myTickets.length > 0 ? (
@@ -647,28 +465,28 @@ export default function UserView({
                         className="space-y-1 flex-1 cursor-pointer"
                       >
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900 dark:text-white text-xs">{t.ticketSubject}: {tItem.subject}</span>
+                          <span className="font-bold text-slate-900 dark:text-white text-xs">หัวข้อเรื่อง: {tItem.subject}</span>
                           {isAdminReply && !isResolved && (
                             <span className="bg-blue-600 text-white text-[10px] font-medium px-2 py-0.5 rounded-full">
-                              {lang === 'th' ? 'แอดมินตอบกลับแล้ว' : 'Admin replied'}
+                              แอดมินตอบกลับแล้ว
                             </span>
                           )}
                         </div>
                         <p className="text-[11px] text-slate-500 truncate max-w-md">
-                          {lastMsg ? `${lastMsg.sender === 'admin' ? 'Admin: ' : 'You: '}${lastMsg.text}` : 'No messages'}
+                          {lastMsg ? `${lastMsg.sender === 'admin' ? 'Admin: ' : 'คุณ: '}${lastMsg.text}` : 'ไม่มีข้อความ'}
                         </p>
                       </div>
 
                       <div className="flex items-center gap-3 self-end md:self-auto">
                         <span className={`text-[10px] font-medium px-2.5 py-1 rounded-full ${isResolved ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900' : 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-900'}`}>
-                          {isResolved ? (lang === 'th' ? 'แก้ไขเรียบร้อย' : 'Resolved') : (lang === 'th' ? 'กำลังตรวจสอบ' : 'Pending')}
+                          {isResolved ? 'แก้ไขเรียบร้อย' : 'กำลังตรวจสอบ'}
                         </span>
                         
                         <button 
                           onClick={() => setActiveChatTicketId(tItem.id)}
                           className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer"
                         >
-                          {lang === 'th' ? 'เปิดแชท' : 'Open Chat'}
+                          เปิดแชท
                         </button>
 
                         {isResolved && (
@@ -676,14 +494,14 @@ export default function UserView({
                             onClick={async () => {
                               showAlert(
                                 'warning',
-                                'Confirm Delete',
-                                'Are you sure to delete this support ticket?',
+                                'ยืนยันการลบ',
+                                'คุณแน่ใจหรือไม่ว่าต้องการลบเคสนี้?',
                                 async () => {
                                   try {
                                     await deleteDoc(doc(db, 'support_tickets', tItem.id));
-                                    showAlert('success', 'Deleted', 'Ticket deleted successfully');
+                                    showAlert('success', 'ลบสำเร็จ', 'ลบเคสเรียบร้อยแล้ว');
                                   } catch {
-                                    showAlert('error', 'Error', 'Failed to delete ticket');
+                                    showAlert('error', 'ข้อผิดพลาด', 'ไม่สามารถลบเคสได้');
                                   }
                                 },
                                 true
@@ -691,7 +509,7 @@ export default function UserView({
                             }}
                             className="bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 text-[11px] font-medium px-2.5 py-1 rounded-lg transition-all cursor-pointer"
                           >
-                            {lang === 'th' ? 'ลบ' : 'Delete'}
+                            ลบ
                           </button>
                         )}
                       </div>
@@ -701,34 +519,34 @@ export default function UserView({
               </div>
             ) : (
               <div className="p-6 text-center border border-dashed rounded-xl text-slate-400 dark:border-slate-800 text-xs">
-                {t.noTickets}
+                ยังไม่มีประวัติการแจ้งเรื่องหรือติดต่อแอดมิน
               </div>
             )}
           </div>
 
           <div className="space-y-4 pt-4">
             <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
-              <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t.contactAdmin}</h3>
+              <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">ติดต่อ / แจ้งปัญหาถึงแอดมิน</h3>
             </div>
             <form onSubmit={handleSendTicket} className="p-6 rounded-xl border bg-white dark:bg-slate-900 shadow-xs border-slate-200 dark:border-slate-800 space-y-4">
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-normal">{t.contactDesc}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-normal">พบปัญหาการใช้งาน แจ้งยกเลิกรอบรถ หรือติดต่อเจ้าหน้าที่ กรุณากรอกหัวข้อเพื่อเปิดเคสและเริ่มสนทนา</p>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="md:col-span-1">
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">{t.ticketSubject}</label>
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">หัวข้อเรื่อง</label>
                   <input 
                     type="text" 
-                    placeholder={t.ticketSubjectPlaceholder} 
+                    placeholder="เช่น ลืมของบนรถสาย 1" 
                     value={ticketSubject}
                     onChange={(e) => setTicketSubject(e.target.value)}
                     className="w-full border border-slate-200 dark:border-slate-800 dark:bg-slate-950 p-2.5 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">{t.ticketDetail}</label>
+                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">รายละเอียด</label>
                   <div className="flex gap-2">
                     <input 
                       type="text" 
-                      placeholder={t.ticketDetailPlaceholder} 
+                      placeholder="อธิบายรายละเอียดปัญหาของคุณ..." 
                       value={ticketFirstMessage}
                       onChange={(e) => setTicketFirstMessage(e.target.value)}
                       className="w-full border border-slate-200 dark:border-slate-800 dark:bg-slate-950 p-2.5 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
@@ -738,7 +556,7 @@ export default function UserView({
                       disabled={isSubmittingTicket}
                       className="bg-blue-600 hover:bg-blue-700 text-white px-5 rounded-xl text-xs font-medium whitespace-nowrap transition-all shadow-sm disabled:opacity-50 cursor-pointer"
                     >
-                      {isSubmittingTicket ? t.submitting : t.startChat}
+                      {isSubmittingTicket ? 'กำลังเปิด...' : 'เริ่มแชท'}
                     </button>
                   </div>
                 </div>
@@ -753,8 +571,8 @@ export default function UserView({
         <div className="max-w-md mx-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xl text-slate-800 dark:text-white">
           <div className="bg-slate-950 text-white p-5 text-center border-b border-slate-800">
             <span className="text-[10px] font-semibold tracking-widest text-slate-400 uppercase">Seat Reservation</span>
-            <h3 className="text-sm font-bold tracking-wide mt-0.5">{t.seatReservation}</h3>
-            <p className="text-[10px] text-amber-400/90 mt-1">{t.cutoffNotice}</p>
+            <h3 className="text-sm font-bold tracking-wide mt-0.5">ระบบสำรองสิทธิ์เดินทาง</h3>
+            <p className="text-[10px] text-amber-400/90 mt-1">ตัดรอบจองเวลา 15:00 น. ของทุกวัน</p>
 
             <div className="flex justify-center items-center gap-3 mt-3 text-[11px] font-bold">
               <span className={`h-6 w-6 rounded-full flex items-center justify-center border ${bookingStep === 1 ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-700 text-slate-400'}`}>1</span>
@@ -771,19 +589,19 @@ export default function UserView({
                 🔒
               </div>
               <div className="space-y-2">
-                <h4 className="font-bold text-slate-900 dark:text-white text-base">{t.systemClosed}</h4>
+                <h4 className="font-bold text-slate-900 dark:text-white text-base">ขณะนี้ระบบปิดรับการจองรถตู้ชั่วคราว</h4>
                 <p className="text-xs text-rose-600 dark:text-rose-400 font-medium bg-rose-50 dark:bg-rose-950/40 p-3 rounded-xl border border-rose-200 dark:border-rose-900 leading-relaxed">
                   {closeReasonMessage}
                 </p>
                 <p className="text-[11px] text-slate-400">
-                  {lang === 'th' ? 'หากมีเหตุจำเป็นฉุกเฉิน กรุณาติดต่อแอดมินผ่านเมนูกล่องข้อความช่วยเหลือ' : 'If urgent, please contact admin via support message box.'}
+                  หากมีเหตุจำเป็นฉุกเฉิน กรุณาติดต่อแอดมินผ่านเมนูกล่องข้อความช่วยเหลือ
                 </p>
               </div>
               <button 
                 onClick={() => setActiveMenu('home')}
                 className="mt-2 bg-slate-900 dark:bg-slate-800 hover:bg-black dark:hover:bg-slate-700 text-white text-xs font-medium px-6 py-2.5 rounded-xl cursor-pointer transition-all"
               >
-                {lang === 'th' ? 'กลับสู่หน้าหลัก' : 'Back to Home'}
+                กลับสู่หน้าหลัก
               </button>
             </div>
           ) : (
@@ -791,7 +609,7 @@ export default function UserView({
               {bookingStep === 1 && (
                 <div className="space-y-4">
                   <div className="space-y-3">
-                    <label className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">1.1 {lang === 'th' ? 'เลือกกะและช่วงเวลาทำงาน' : 'Select Work Shift'}</label>
+                    <label className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">1.1 เลือกกะและช่วงเวลาทำงาน</label>
                     
                     <div className="grid grid-cols-2 gap-2">
                       <button 
@@ -802,7 +620,7 @@ export default function UserView({
                         }}
                         className={`p-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${shiftType === 'Day' ? 'bg-blue-600 border-blue-600 text-white shadow-sm' : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
                       >
-                        {t.shiftDay}
+                        กะ Day
                       </button>
                       <button 
                         type="button"
@@ -812,20 +630,20 @@ export default function UserView({
                         }}
                         className={`p-3 rounded-xl border text-xs font-semibold transition-all cursor-pointer ${shiftType === 'Shift' ? 'bg-purple-600 border-purple-600 text-white shadow-sm' : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
                       >
-                        {t.shiftShift}
+                        กะ Shift
                       </button>
                     </div>
 
                     {shiftType === 'Day' ? (
                       <div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800">
-                        <p className="text-[11px] font-semibold text-slate-500 mb-1">{t.shiftDay}:</p>
+                        <p className="text-[11px] font-semibold text-slate-500 mb-1">กะ Day:</p>
                         <div className="text-xs font-semibold bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200">
-                          {t.workTimeDay}
+                          เข้างาน 08:00 น. / เลิกงาน 17:00 น.
                         </div>
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        <p className="text-[11px] font-semibold text-slate-500">{t.selectShiftSlot}</p>
+                        <p className="text-[11px] font-semibold text-slate-500">เลือกช่วงเวลากะ Shift:</p>
                         <div className="grid grid-cols-1 gap-2">
                           <label className={`flex items-center gap-2 p-3 rounded-xl border cursor-pointer text-xs font-medium ${shiftTimeSlot === '06:00 - 18:30' ? 'border-purple-600 bg-purple-50/20 dark:bg-purple-950/20 text-purple-600 dark:text-purple-400' : 'border-slate-200 dark:border-slate-800'}`}>
                             <input 
@@ -852,8 +670,8 @@ export default function UserView({
 
                   <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
                     <div className="flex justify-between items-center">
-                      <label className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">1.2 {t.vanRoutes}</label>
-                      <span className="text-[10px] text-slate-400">{filteredRoutesList.length} {t.items}</span>
+                      <label className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">1.2 เลือกสายรถตู้สวัสดิการ</label>
+                      <span className="text-[10px] text-slate-400">{filteredRoutesList.length} รายการ</span>
                     </div>
                     
                     <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
@@ -872,22 +690,22 @@ export default function UserView({
                             <div className="flex justify-between items-start">
                               <p className="font-semibold text-slate-900 dark:text-white text-xs">{r.name}</p>
                               <span className="text-[10px] px-2 py-0.5 rounded font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                                {r.shiftType || 'All Shifts'}
+                                {r.shiftType || 'ทุกกะ'}
                               </span>
                             </div>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Plate: {r.plate || r.vanPlate} | Driver: {r.driver || r.driverName}</p>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">ทะเบียน: {r.plate || r.vanPlate} | คนขับ: {r.driver || r.driverName}</p>
                           </div>
                         ))
                       ) : (
                         <div className="p-4 text-center text-xs text-slate-400 border border-dashed rounded-xl">
-                          No van routes found for this shift
+                          ไม่พบสายรถตู้สำหรับกะเวลานี้
                         </div>
                       )}
                     </div>
                   </div>
 
                   <div className="space-y-2.5 pt-2 border-t border-slate-200 dark:border-slate-800">
-                    <label className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">1.3 {t.tripType}</label>
+                    <label className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">1.3 เลือกประเภทการเดินทาง</label>
                     
                     <div className="grid grid-cols-1 gap-2">
                       <label className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border text-xs font-semibold cursor-pointer transition-all backdrop-blur-md ${
@@ -902,7 +720,7 @@ export default function UserView({
                           onChange={() => setTripType('roundTrip')} 
                           className="accent-blue-600 dark:accent-blue-500 w-4 h-4 cursor-pointer"
                         />
-                        <span>{t.roundTrip}</span>
+                        <span>ไป-กลับ (ทั้งขามาและขากลับ)</span>
                       </label>
 
                       <label className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border text-xs font-semibold cursor-pointer transition-all backdrop-blur-md ${
@@ -917,7 +735,7 @@ export default function UserView({
                           onChange={() => setTripType('inboundOnly')} 
                           className="accent-blue-600 dark:accent-blue-500 w-4 h-4 cursor-pointer"
                         />
-                        <span>{t.inboundOnly}</span>
+                        <span>เฉพาะขามา (ขาไปอย่างเดียว)</span>
                       </label>
 
                       <label className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border text-xs font-semibold cursor-pointer transition-all backdrop-blur-md ${
@@ -932,7 +750,7 @@ export default function UserView({
                           onChange={() => setTripType('outboundOnly')} 
                           className="accent-blue-600 dark:accent-blue-500 w-4 h-4 cursor-pointer"
                         />
-                        <span>{t.outboundOnly}</span>
+                        <span>เฉพาะขากลับอย่างเดียว</span>
                       </label>
                     </div>
                   </div>
@@ -941,18 +759,18 @@ export default function UserView({
                     disabled={!isSystemOpen}
                     onClick={() => {
                       if (!checkIsBookingOpen()) {
-                        showAlert('error', 'Closed', closeReasonMessage);
+                        showAlert('error', 'ระบบปิด', closeReasonMessage);
                         return;
                       }
                       if (filteredRoutesList.length === 0) {
-                        showAlert('warning', 'Warning', 'Please select a shift with available routes.');
+                        showAlert('warning', 'คำเตือน', 'กรุณาเลือกกะเวลาที่มีสายรถเปิดให้บริการ');
                         return;
                       }
                       setBookingStep(2);
                     }} 
                     className="w-full bg-slate-900 hover:bg-black dark:bg-slate-800 dark:hover:bg-slate-700 text-white font-medium py-2.5 rounded-xl text-center mt-2 cursor-pointer text-xs transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {t.nextStep}
+                    ขั้นตอนถัดไป (กรอกข้อมูลส่วนตัว & จุดขึ้นรถ) →
                   </button>
                 </div>
               )}
@@ -960,22 +778,22 @@ export default function UserView({
               {bookingStep === 2 && (
                 <div className="space-y-4">
                   <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
-                    <span className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">{t.contactInfo}</span>
+                    <span className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">ข้อมูลติดต่อสำหรับคนขับ</span>
                     <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">{t.empName}</label>
+                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">ชื่อ - นามสกุล พนักงาน</label>
                       <input 
                         type="text" 
-                        placeholder="Name - Surname" 
+                        placeholder="ชื่อ - นามสกุล" 
                         value={employeeName} 
                         onChange={(e) => setEmployeeName(e.target.value)} 
                         className="w-full border border-slate-200 dark:border-slate-800 dark:bg-slate-900 p-2.5 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 text-xs" 
                       />
                     </div>
                     <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">{t.empPhone}</label>
+                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">เบอร์โทรศัพท์</label>
                       <input 
                         type="tel" 
-                        placeholder="e.g. 0812345678" 
+                        placeholder="เช่น 0812345678" 
                         value={employeePhone} 
                         onChange={(e) => setEmployeePhone(e.target.value)} 
                         className="w-full border border-slate-200 dark:border-slate-800 dark:bg-slate-900 p-2.5 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 text-xs" 
@@ -984,7 +802,7 @@ export default function UserView({
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider mb-1.5">{t.selectStation}</label>
+                    <label className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider mb-1.5">สถานีจุดจอดรับและตารางเวลา</label>
                     <select 
                       value={selectedStationIndex} 
                       onChange={(e) => setSelectedStationIndex(Number(e.target.value))} 
@@ -992,14 +810,14 @@ export default function UserView({
                     >
                       {activeStations.map((st: any, i: number) => (
                         <option key={i} value={i} className="dark:bg-slate-950">
-                          Stop #{st.index}: {st.name} ({st.time})
+                          จุดที่ #{st.index}: {st.name} ({st.time})
                         </option>
                       ))}
                     </select>
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider mb-1.5">{t.selectDates}</label>
+                    <label className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider mb-1.5">ระบุวันที่ต้องการจอง (เลือกได้หลายวัน)</label>
                     <div className="flex gap-2">
                       <input 
                         type="date" 
@@ -1024,14 +842,14 @@ export default function UserView({
                         }}
                         className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 rounded-xl text-xs font-medium whitespace-nowrap cursor-pointer transition-all"
                       >
-                        {t.addDate}
+                        เพิ่มวัน
                       </button>
                     </div>
                   </div>
 
                   {travelDate && (
                     <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 space-y-2">
-                      <span className="text-[11px] font-semibold text-slate-500 block">{t.selectedDates}</span>
+                      <span className="text-[11px] font-semibold text-slate-500 block">วันที่เลือกไว้แล้ว:</span>
                       <div className="flex flex-wrap gap-1.5">
                         {travelDate.split(',').map((d: string, idx: number) => (
                           <span key={idx} className="bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 text-[11px] font-medium px-2.5 py-1 rounded-lg flex items-center gap-1.5">
@@ -1057,23 +875,23 @@ export default function UserView({
                       onClick={() => setBookingStep(1)} 
                       className="w-1/3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium py-2.5 rounded-xl text-xs cursor-pointer transition-all"
                     >
-                      {t.back}
+                      ย้อนกลับ
                     </button>
                     <button 
                       onClick={() => {
                         if (!employeeName.trim() || !employeePhone.trim()) {
-                          showAlert('warning', 'Missing Info', 'Please enter employee name and phone number.');
+                          showAlert('warning', 'ข้อมูลไม่ครบถ้วน', 'กรุณากรอกชื่อและเบอร์โทรศัพท์พนักงาน');
                           return;
                         }
                         if (!travelDate) {
-                          showAlert('warning', 'Missing Date', 'Please select at least one travel date.');
+                          showAlert('warning', 'ยังไม่ได้เลือกวัน', 'กรุณาเลือกวันที่ต้องการเดินทางอย่างน้อย 1 วัน');
                           return;
                         }
                         setBookingStep(3);
                       }} 
                       className="w-2/3 bg-slate-900 hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-medium py-2.5 rounded-xl text-xs cursor-pointer transition-all shadow-sm"
                     >
-                      {t.checkData}
+                      ตรวจสอบข้อมูล →
                     </button>
                   </div>
                 </div>
@@ -1082,18 +900,18 @@ export default function UserView({
               {bookingStep === 3 && (
                 <div className="space-y-4">
                   <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3 text-xs">
-                    <span className="block font-bold uppercase text-slate-500 tracking-wider mb-2">{t.summaryTitle}</span>
+                    <span className="block font-bold uppercase text-slate-500 tracking-wider mb-2">สรุปข้อมูลการสำรองที่นั่ง</span>
                     <div className="space-y-1.5 text-slate-600 dark:text-slate-300">
-                      <p><strong>Shift:</strong> {shiftType === 'Day' ? 'Day Shift' : 'Rotation Shift'} ({shiftTimeSlot})</p>
-                      <p><strong>Trip Type:</strong> {tripType === 'roundTrip' ? t.roundTrip : tripType === 'inboundOnly' ? t.inboundOnly : t.outboundOnly}</p>
-                      <p><strong>Route:</strong> {selectedRouteName}</p>
-                      <p><strong>Name:</strong> {employeeName}</p>
-                      <p><strong>Phone:</strong> {employeePhone}</p>
-                      <p><strong>Pickup Stop:</strong> Stop #{activeStations[selectedStationIndex]?.index}: {activeStations[selectedStationIndex]?.name} ({activeStations[selectedStationIndex]?.time})</p>
+                      <p><strong>กะทำงาน:</strong> {shiftType === 'Day' ? 'กะ Day' : 'กะ Shift'} ({shiftTimeSlot})</p>
+                      <p><strong>ประเภทการเดินทาง:</strong> {tripType === 'roundTrip' ? 'ไป-กลับ' : tripType === 'inboundOnly' ? 'เฉพาะขามา' : 'เฉพาะขากลับ'}</p>
+                      <p><strong>สายรถ:</strong> {selectedRouteName}</p>
+                      <p><strong>ชื่อผู้เดินทาง:</strong> {employeeName}</p>
+                      <p><strong>เบอร์โทรศัพท์:</strong> {employeePhone}</p>
+                      <p><strong>จุดรับ-ส่ง:</strong> จุดที่ #{activeStations[selectedStationIndex]?.index}: {activeStations[selectedStationIndex]?.name} ({activeStations[selectedStationIndex]?.time})</p>
                     </div>
                     
                     <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-1.5">
-                      <strong className="block text-slate-700 dark:text-slate-300">Selected Travel Dates:</strong>
+                      <strong className="block text-slate-700 dark:text-slate-300">วันที่เดินทางที่เลือก:</strong>
                       <div className="grid grid-cols-2 gap-1.5 max-h-32 overflow-y-auto pr-1">
                         {travelDate.split(',').map((d: string, idx: number) => (
                           <div key={idx} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-2.5 py-1.5 rounded-lg text-center font-mono font-medium text-blue-600 dark:text-blue-400">
@@ -1109,19 +927,19 @@ export default function UserView({
                       onClick={() => setBookingStep(2)} 
                       className="w-1/3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium py-2.5 rounded-xl text-xs cursor-pointer"
                     >
-                      {lang === 'th' ? 'แก้ไข' : 'Edit'}
+                      แก้ไข
                     </button>
                     <button 
                       disabled={isBookingLoading || !isSystemOpen} 
                       onClick={async () => {
                         if (!checkIsBookingOpen()) {
-                          showAlert('error', 'Closed', closeReasonMessage);
+                          showAlert('error', 'ระบบปิด', closeReasonMessage);
                           return;
                         }
 
                         const currentActiveRoute = filteredRoutesList.find(r => r.id === selectedRouteId) || filteredRoutesList[0] || routesList[0];
                         if (!currentActiveRoute || !travelDate || !employeeName || !employeePhone) {
-                          showAlert('warning', 'Missing Info', 'Please fill all required information.');
+                          showAlert('warning', 'ข้อมูลไม่ครบถ้วน', 'กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน');
                           return;
                         }
 
@@ -1172,22 +990,22 @@ export default function UserView({
 
                           showAlert(
                             'success', 
-                            lang === 'th' ? 'จองรถสำเร็จ' : 'Booking Successful', 
-                            lang === 'th' ? 'ระบบบันทึกรายการจองของคุณเรียบร้อยแล้ว' : 'Your seats have been reserved.', 
+                            'จองรถสำเร็จ', 
+                            'ระบบบันทึกรายการจองของคุณเรียบร้อยแล้ว', 
                             () => {
                               setActiveMenu('history');
                               setBookingStep(1);
                             }
                           );
                         } catch {
-                          showAlert('error', 'Error', 'Failed to save bookings.');
+                          showAlert('error', 'เกิดข้อผิดพลาด', 'ไม่สามารถบันทึกรายการจองได้');
                         } finally { 
                           setIsBookingLoading(false); 
                         }
                       }} 
                       className="w-2/3 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-xl text-xs shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all"
                     >
-                      {isBookingLoading ? t.saving : t.confirmBooking}
+                      {isBookingLoading ? 'กำลังบันทึก...' : 'ยืนยันสำรองสิทธิ์'}
                     </button>
                   </div>
                 </div>
@@ -1201,29 +1019,29 @@ export default function UserView({
       {activeMenu === 'shiftRequest' && (
         <div className="max-w-xl mx-auto space-y-6">
           <div className="border-b border-slate-200 dark:border-slate-800 pb-2">
-            <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t.shiftRequestTitle}</h3>
-            <p className="text-xs text-slate-400 mt-0.5">{t.shiftRequestSub}</p>
+            <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">แจ้งขอเปลี่ยนกะ / ออกก่อนเวลา (Ad-hoc Request)</h3>
+            <p className="text-xs text-slate-400 mt-0.5">ใช้สำหรับกรณีมีเหตุจำเป็นต้องออกก่อนเวลากะปกติที่ระบบตั้งไว้ เพื่อให้แอดมินอนุมัติและปรับบันทึกเวลา</p>
           </div>
 
           <form onSubmit={handleSubmitShiftRequest} className="p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl space-y-4 text-xs">
             <div>
-              <label className="block font-semibold text-slate-600 dark:text-slate-400 mb-1">{t.selectPrevBooking}</label>
+              <label className="block font-semibold text-slate-600 dark:text-slate-400 mb-1">เลือกจากประวัติการจองของคุณ (ถ้ามี)</label>
               <select 
                 value={selectedBookingId}
                 onChange={handleSelectBookingForShiftReq}
                 className="w-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl font-medium text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer"
               >
-                <option value="">{t.optSelectBooking}</option>
+                <option value="">-- เลือกรายการจองเดิมเพื่อดึงข้อมูล -- (ไม่บังคับ)</option>
                 {myBookings.map((b: any) => (
                   <option key={b.id} value={b.id}>
-                    Date: {formatThaiDate(b.travelDate)} | Route: {b.route} | Shift: {b.shiftType}
+                    วันที่: {formatThaiDate(b.travelDate)} | สายรถ: {b.route} | กะ: {b.shiftType}
                   </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="block font-semibold text-slate-600 dark:text-slate-400 mb-1">{t.reqDate}</label>
+              <label className="block font-semibold text-slate-600 dark:text-slate-400 mb-1">1. เลือกวันที่ต้องการเปลี่ยนเวลา</label>
               <input 
                 type="date"
                 value={shiftReqDate}
@@ -1233,34 +1051,34 @@ export default function UserView({
             </div>
 
             <div>
-              <label className="block font-semibold text-slate-600 dark:text-slate-400 mb-1">{t.reqOriginal}</label>
+              <label className="block font-semibold text-slate-600 dark:text-slate-400 mb-1">2. กะเวลาปกติในระบบ</label>
               <input 
                 type="text"
                 value={shiftReqOriginal}
                 onChange={(e) => setShiftReqOriginal(e.target.value)}
-                placeholder="e.g. Shift (06:00 - 18:30)"
+                placeholder="เช่น กะ Shift (06:00 - 18:30 น.)"
                 className="w-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl font-medium text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
               />
             </div>
 
             <div>
-              <label className="block font-semibold text-slate-600 dark:text-slate-400 mb-1">{t.reqNewTime}</label>
+              <label className="block font-semibold text-slate-600 dark:text-slate-400 mb-1">3. เวลาที่ขอออกจริง (เช่น ขอออกเร็วขึ้น)</label>
               <input 
                 type="text"
                 value={shiftReqNewTime}
                 onChange={(e) => setShiftReqNewTime(e.target.value)}
-                placeholder="e.g. 17:00"
+                placeholder="เช่น 17:00"
                 className="w-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl font-medium text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
               />
             </div>
 
             <div>
-              <label className="block font-semibold text-slate-600 dark:text-slate-400 mb-1">{t.reqReason}</label>
+              <label className="block font-semibold text-slate-600 dark:text-slate-400 mb-1">4. เหตุผลความจำเป็น</label>
               <textarea 
                 rows={3}
                 value={shiftReqReason}
                 onChange={(e) => setShiftReqReason(e.target.value)}
-                placeholder="Describe reason..."
+                placeholder="อธิบายรายละเอียดความจำเป็น..."
                 className="w-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl font-medium text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
               />
             </div>
@@ -1270,23 +1088,23 @@ export default function UserView({
               disabled={isSubmittingShiftReq}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 rounded-xl transition-all shadow-sm disabled:opacity-50 cursor-pointer"
             >
-              {isSubmittingShiftReq ? t.submittingReq : t.submitReq}
+              {isSubmittingShiftReq ? 'กำลังส่งคำขอ...' : 'ส่งคำขอให้แอดมินอนุมัติ'}
             </button>
           </form>
 
           <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4">
-            <h3 className="font-bold text-sm text-slate-700 dark:text-slate-300 uppercase tracking-wider">📋 {t.reqHistory}</h3>
+            <h3 className="font-bold text-sm text-slate-700 dark:text-slate-300 uppercase tracking-wider">📋 ประวัติและสถานะคำขอเปลี่ยนกะของคุณ</h3>
             
             <div className="space-y-3">
               {myShiftRequests.length === 0 ? (
-                <p className="text-xs text-slate-400 py-4 text-center">{t.noReqHistory}</p>
+                <p className="text-xs text-slate-400 py-4 text-center">คุณยังไม่มีประวัติการส่งคำขอเปลี่ยนกะ</p>
               ) : (
                 myShiftRequests.map((req) => {
                   const status = req.status || 'Pending';
                   return (
                     <div key={req.id} className="p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 space-y-2 text-xs">
                       <div className="flex justify-between items-center">
-                        <span className="font-bold text-slate-800 dark:text-slate-200">Date: {formatThaiDate(req.requestDate)}</span>
+                        <span className="font-bold text-slate-800 dark:text-slate-200">วันที่: {formatThaiDate(req.requestDate)}</span>
                         
                         <span className={`px-2.5 py-1 rounded-lg font-bold border ${
                           status === 'Approved' 
@@ -1295,16 +1113,16 @@ export default function UserView({
                             ? 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300' 
                             : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300'
                         }`}>
-                          {status === 'Approved' ? '✅ Approved' : status === 'Rejected' ? '❌ Rejected' : '⏳ Pending'}
+                          {status === 'Approved' ? '✅ อนุมัติแล้ว' : status === 'Rejected' ? '❌ ปฏิเสธ' : '⏳ รอดำเนินการ'}
                         </span>
                       </div>
 
-                      <p className="text-slate-500">Regular: {req.originalShift} | Requested Time: <strong className="text-blue-600">{req.requestedTime}</strong></p>
-                      <p className="text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 p-2 rounded border border-slate-200 dark:border-slate-800">Reason: {req.reason}</p>
+                      <p className="text-slate-500">กะปกติ: {req.originalShift} | เวลาที่ขอออก: <strong className="text-blue-600">{req.requestedTime}</strong></p>
+                      <p className="text-slate-600 dark:text-slate-300 bg-white dark:bg-slate-900 p-2 rounded border border-slate-200 dark:border-slate-800">เหตุผล: {req.reason}</p>
 
                       {status === 'Rejected' && req.adminRejectReason && (
                         <div className="text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 p-2 rounded border border-red-100 dark:border-red-900">
-                          <strong>Reject reason:</strong> {req.adminRejectReason}
+                          <strong>เหตุผลที่ไม่อนุมัติ:</strong> {req.adminRejectReason}
                         </div>
                       )}
                     </div>
@@ -1320,13 +1138,13 @@ export default function UserView({
       {activeMenu === 'history' && (
         <div className="max-w-3xl mx-auto space-y-6">
           <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-2">
-            <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t.historyTitle}</h3>
-            <span className="text-[11px] text-slate-400">{t.totalItems} {myBookings.length} {t.items}</span>
+            <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">ประวัติการจอง</h3>
+            <span className="text-[11px] text-slate-400">ทั้งหมด {myBookings.length} รายการ</span>
           </div>
 
           <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
             <div>
-              <label className="block font-semibold text-slate-500 mb-1">{t.filterByDate}</label>
+              <label className="block font-semibold text-slate-500 mb-1">กรองตามวันที่เดินทาง</label>
               <input 
                 type="date"
                 value={historyFilterDate}
@@ -1335,13 +1153,13 @@ export default function UserView({
               />
             </div>
             <div>
-              <label className="block font-semibold text-slate-500 mb-1">{t.filterByRoute}</label>
+              <label className="block font-semibold text-slate-500 mb-1">กรองตามสายรถ</label>
               <select
                 value={historyFilterRoute}
                 onChange={(e) => setHistoryFilterRoute(e.target.value)}
                 className="w-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-2.5 rounded-lg font-medium text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer"
               >
-                <option value="">{t.allRoutes}</option>
+                <option value="">ทุกสายรถ</option>
                 {routesList.map((r: any) => (
                   <option key={r.id} value={r.name}>{r.name}</option>
                 ))}
@@ -1356,13 +1174,13 @@ export default function UserView({
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-slate-900 dark:text-white text-xs">{b.route}</span>
-                      <span className="text-[10px] bg-purple-50 dark:bg-purple-950/40 text-purple-600 px-2 py-0.5 rounded font-medium">Shift: {b.shiftType}</span>
+                      <span className="text-[10px] bg-purple-50 dark:bg-purple-950/40 text-purple-600 px-2 py-0.5 rounded font-medium">กะ: {b.shiftType}</span>
                       <span className="text-[10px] bg-blue-50 dark:bg-blue-950/40 text-blue-600 px-2 py-0.5 rounded font-medium">
-                        {b.tripType === 'inboundOnly' ? t.inboundOnly : b.tripType === 'outboundOnly' ? t.outboundOnly : t.roundTrip}
+                        {b.tripType === 'inboundOnly' ? 'เฉพาะขามา' : b.tripType === 'outboundOnly' ? 'เฉพาะขากลับ' : 'ไป-กลับ'}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Pickup: {b.pickupLocation} ({b.time}) | Van: {b.vanPlate}</p>
-                    <p className="text-[11px] text-slate-400 font-mono">Date: {formatThaiDate(b.travelDate)}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">จุดขึ้นรถ: {b.pickupLocation} ({b.time}) | ทะเบียน: {b.vanPlate}</p>
+                    <p className="text-[11px] text-slate-400 font-mono">วันที่: {formatThaiDate(b.travelDate)}</p>
                   </div>
                   
                   <div className="flex items-center gap-2 self-start md:self-auto">
@@ -1373,17 +1191,17 @@ export default function UserView({
                       }}
                       className="bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 font-semibold px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer"
                     >
-                      {t.viewQr}
+                      ดู QR Code
                     </button>
                     <span className="text-[10px] font-medium px-2.5 py-1.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900">
-                      {t.confirmed}
+                      ยืนยันแล้ว
                     </span>
                   </div>
                 </div>
               ))
             ) : (
               <div className="text-center py-12 border border-dashed rounded-xl text-slate-400 dark:text-slate-500 dark:border-slate-800 text-xs">
-                {t.noHistory}
+                ไม่พบประวัติการจองตามเงื่อนไขที่เลือก
               </div>
             )}
           </div>
@@ -1395,11 +1213,11 @@ export default function UserView({
         <div className="max-w-md mx-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl text-center space-y-4">
           <div className="border-b border-slate-200 dark:border-slate-800 pb-3">
             <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Check-in Pass</span>
-            <h3 className="font-bold text-sm mt-0.5">{t.checkinPass}</h3>
+            <h3 className="font-bold text-sm mt-0.5">คิวอาร์โค้ดสำหรับเช็คอินขึ้นรถ</h3>
           </div>
           {recentBooking ? (
             <div className="space-y-3">
-              <p className="text-xs text-slate-600 dark:text-slate-300">{t.qrDesc}</p>
+              <p className="text-xs text-slate-600 dark:text-slate-300">แสดงคิวอาร์โค้ดนี้ให้คนขับรถสแกนเมื่อถึงจุดรับ</p>
               <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl inline-block">
                 <img 
                   src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(recentBooking.id || 'NO_ID')}`} 
@@ -1408,16 +1226,16 @@ export default function UserView({
                 />
               </div>
               <div className="text-xs text-slate-500 space-y-1">
-                <p><strong>Name:</strong> {recentBooking.employeeName}</p>
-                <p><strong>Route:</strong> {recentBooking.route}</p>
-                <p><strong>Shift:</strong> {recentBooking.shiftType} ({recentBooking.shiftTimeSlot})</p>
-                <p><strong>Trip Type:</strong> {recentBooking.tripType === 'inboundOnly' ? t.inboundOnly : recentBooking.tripType === 'outboundOnly' ? t.outboundOnly : t.roundTrip}</p>
-                <p><strong>Date:</strong> {formatThaiDate(recentBooking.travelDate)}</p>
+                <p><strong>ชื่อผู้เดินทาง:</strong> {recentBooking.employeeName}</p>
+                <p><strong>สายรถ:</strong> {recentBooking.route}</p>
+                <p><strong>กะการทำงาน:</strong> {recentBooking.shiftType} ({recentBooking.shiftTimeSlot})</p>
+                <p><strong>ประเภทการเดินทาง:</strong> {recentBooking.tripType === 'inboundOnly' ? 'เฉพาะขามา' : recentBooking.tripType === 'outboundOnly' ? 'เฉพาะขากลับ' : 'ไป-กลับ'}</p>
+                <p><strong>วันที่เดินทาง:</strong> {formatThaiDate(recentBooking.travelDate)}</p>
               </div>
             </div>
           ) : (
             <div className="py-12 text-slate-400 text-xs">
-              {t.noQr}
+              ยังไม่มีข้อมูลการจองล่าสุด กรุณาทำรายการจองก่อนครับ
             </div>
           )}
         </div>
@@ -1429,7 +1247,7 @@ export default function UserView({
           <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl p-6 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-4 text-xs flex flex-col max-h-[85vh]">
             <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3">
               <h3 className="font-bold text-sm text-slate-900 dark:text-white">
-                {t.dailyListTitle} <span className="text-blue-600 dark:text-blue-400 font-mono">{formatThaiDate(selectedSummaryDate)}</span>
+                รายชื่อพนักงานเดินทางวันที่ <span className="text-blue-600 dark:text-blue-400 font-mono">{formatThaiDate(selectedSummaryDate)}</span>
               </h3>
               <div className="flex items-center gap-2">
                 <input 
@@ -1449,7 +1267,7 @@ export default function UserView({
             
             <div className="flex-1 overflow-y-auto space-y-4 pr-1">
               {summaryBookings.length === 0 ? (
-                <div className="py-12 text-center text-slate-400">No passengers registered for {formatThaiDate(selectedSummaryDate)}</div>
+                <div className="py-12 text-center text-slate-400">ไม่มีพนักงานลงทะเบียนเดินทางสำหรับวันที่ {formatThaiDate(selectedSummaryDate)}</div>
               ) : (
                 routesList.map((route: any) => {
                   const routeBookings = summaryBookings.filter((b: any) => b.route === route.name);
@@ -1458,14 +1276,14 @@ export default function UserView({
                     <div key={route.id} className="p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
                       <div className="flex justify-between items-center border-b border-slate-200/60 dark:border-slate-800 pb-2">
                         <span className="font-bold text-blue-600 dark:text-blue-400 text-xs">{route.name}</span>
-                        <span className="text-[10px] bg-slate-200 dark:bg-slate-800 px-2 py-0.5 rounded font-semibold">{routeBookings.length} {t.items}</span>
+                        <span className="text-[10px] bg-slate-200 dark:bg-slate-800 px-2 py-0.5 rounded font-semibold">{routeBookings.length} รายการ</span>
                       </div>
                       <div className="space-y-1.5">
                         {routeBookings.map((b: any, bIdx: number) => (
                           <div key={bIdx} className="flex justify-between items-center bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-800 text-[11px]">
                             <div>
                               <span className="font-bold text-slate-800 dark:text-slate-100">{bIdx + 1}. {b.employeeName || b.employeeEmail}</span>
-                              <span className="block text-slate-400">Pickup: {b.pickupLocation} ({b.time})</span>
+                              <span className="block text-slate-400">จุดขึ้นรถ: {b.pickupLocation} ({b.time})</span>
                             </div>
                             <span className="font-mono text-slate-600 dark:text-slate-300">{b.employeePhone || '-'}</span>
                           </div>
@@ -1482,7 +1300,7 @@ export default function UserView({
                 onClick={() => setShowSummaryModal(false)}
                 className="bg-slate-900 text-white dark:bg-slate-800 px-5 py-2 rounded-xl text-xs font-medium cursor-pointer"
               >
-                {t.close}
+                ปิดหน้าต่าง
               </button>
             </div>
           </div>
@@ -1496,7 +1314,7 @@ export default function UserView({
             <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-3">
               <div>
                 <span className="text-[10px] text-slate-400 font-mono">ID: {activeTicketData.id}</span>
-                <h3 className="font-bold text-sm text-slate-900 dark:text-white">{t.ticketSubject}: {activeTicketData.subject}</h3>
+                <h3 className="font-bold text-sm text-slate-900 dark:text-white">หัวข้อเรื่อง: {activeTicketData.subject}</h3>
               </div>
               <button 
                 onClick={() => setActiveChatTicketId(null)}
@@ -1511,7 +1329,7 @@ export default function UserView({
                 const isAdmin = msg.sender === 'admin';
                 return (
                   <div key={mIdx} className={`flex flex-col ${isAdmin ? 'items-start' : 'items-end'}`}>
-                    <span className="text-[9px] text-slate-400 mb-0.5">{isAdmin ? 'Admin' : 'You'}</span>
+                    <span className="text-[9px] text-slate-400 mb-0.5">{isAdmin ? 'แอดมิน' : 'คุณ'}</span>
                     <div className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-xs ${isAdmin ? 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 rounded-tl-none' : 'bg-blue-600 text-white rounded-tr-none'}`}>
                       {msg.text}
                     </div>
@@ -1524,7 +1342,7 @@ export default function UserView({
               <form onSubmit={handleSendReply} className="flex gap-2 pt-2">
                 <input 
                   type="text"
-                  placeholder={lang === 'th' ? 'พิมพ์ข้อความตอบกลับแอดมิน...' : 'Type a reply...'}
+                  placeholder="พิมพ์ข้อความตอบกลับแอดมิน..."
                   value={replyMessage}
                   onChange={(e) => setReplyMessage(e.target.value)}
                   className="w-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl text-xs text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
@@ -1533,12 +1351,12 @@ export default function UserView({
                   type="submit"
                   className="bg-blue-600 hover:bg-blue-700 text-white px-5 rounded-xl font-medium cursor-pointer transition-all"
                 >
-                  {lang === 'th' ? 'ส่ง' : 'Send'}
+                  ส่ง
                 </button>
               </form>
             ) : (
               <div className="text-center py-2 text-emerald-600 font-semibold bg-emerald-50 dark:bg-emerald-950/30 rounded-xl">
-                {lang === 'th' ? 'เคสนี้ได้รับการแก้ไขเรียบร้อยแล้ว' : 'This case has been resolved.'}
+                เคสนี้ได้รับการแก้ไขเรียบร้อยแล้ว
               </div>
             )}
           </div>

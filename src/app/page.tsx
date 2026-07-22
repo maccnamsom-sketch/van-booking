@@ -183,7 +183,7 @@ export default function EnterpriseVanBookingSystem() {
               )}
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700">อีเมลองค์กร</label>
+                <label className="text-xs font-semibold text-slate-700">อีเมล</label>
                 <div className="relative">
                   <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input 
@@ -222,7 +222,7 @@ export default function EnterpriseVanBookingSystem() {
             </form>
 
             <div className="mt-8 text-center text-[11px] text-slate-400">
-              พบปัญหาการใช้งาน ติดต่อ <span className="font-semibold text-slate-600 underline cursor-pointer">IT Support</span>
+              พบปัญหาการใช้งาน ติดต่อ <span className="font-semibold text-slate-600 underline cursor-pointer">Admin</span>
             </div>
           </div>
 
