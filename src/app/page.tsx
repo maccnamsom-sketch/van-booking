@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { Mail, Lock, Bus, AlertCircle } from 'lucide-react';
 
 // นำเข้า auth และ db จากไฟล์กลาง src/lib/firebase.ts ของโปรเจกต์
 import { auth, db } from '../lib/firebase';
@@ -15,14 +16,13 @@ export default function EnterpriseVanBookingSystem() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  // เพิ่ม 'shiftRequest' เข้าไปใน Type ของ activeMenu
   const [activeMenu, setActiveMenu] = useState<'home' | 'booking' | 'history' | 'qrcode' | 'admin' | 'shiftRequest'>('home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // ตรวจสอบสิทธิ์ว่าเป็นแอดมินหรือไม่
   const isAdmin = user?.email === 'admin@company.com';
 
-  // เด้งกลับหน้าหลักอัตโนมัติถ้าแฮกเข้าเมนูแอดมินผ่าน url/state
+  // เด้งกลับหน้าหลักอัตโนมัติถ้าเข้าเมนูแอดมินโดยไม่มีสิทธิ์
   useEffect(() => {
     if (user && !isAdmin && activeMenu === 'admin') {
       setActiveMenu('home');
@@ -43,7 +43,7 @@ export default function EnterpriseVanBookingSystem() {
   const [bookingsList, setBookingsList] = useState<any[]>([]);
   const [announcementsList, setAnnouncementsList] = useState<any[]>([]);
   const [ticketsList, setTicketsList] = useState<any[]>([]);
-  const [adHocRequestsList, setAdHocRequestsList] = useState<any[]>([]); // State สำหรับเก็บข้อมูลคำขอเปลี่ยนกะ
+  const [adHocRequestsList, setAdHocRequestsList] = useState<any[]>([]);
   const [recentBooking, setRecentBooking] = useState<any>(null);
 
   // Login Form States
@@ -52,11 +52,18 @@ export default function EnterpriseVanBookingSystem() {
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
+  // 1. useEffect สำหรับเช็ก Auth State เสมอ
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
       setLoading(false);
     });
+    return () => unsubscribeAuth();
+  }, []);
+
+  // 2. useEffect สำหรับ Subscribe Firestore Data (ทำงานเฉพาะตอนที่มี user ล็อกอินแล้วเท่านั้น!)
+  useEffect(() => {
+    if (!user) return; // 🛑 ป้องกัน Permission Denied: ถ้ายังไม่ได้ล็อกอิน จะไม่สั่งรัน Listener ดึงข้อมูล
 
     const unsubscribeRoutes = onSnapshot(query(collection(db, 'van_routes')), (snapshot) => {
       setRoutesList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -79,7 +86,6 @@ export default function EnterpriseVanBookingSystem() {
       setTicketsList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    // ดึงข้อมูลคำขอเปลี่ยนกะ / ออกก่อนเวลา จาก Collection 'shiftRequests'
     const unsubscribeShiftRequests = onSnapshot(query(collection(db, 'shiftRequests')), (snapshot) => {
       const list = snapshot.docs.map(doc => ({
         id: doc.id,
@@ -89,12 +95,11 @@ export default function EnterpriseVanBookingSystem() {
     });
 
     return () => {
-      unsubscribeAuth();
       unsubscribeRoutes();
       unsubscribeBookings();
       unsubscribeAnnounce();
       unsubscribeTickets();
-      unsubscribeShiftRequests(); // ยกเลิกการ subscribe เมื่อ component unmount
+      unsubscribeShiftRequests();
     };
   }, [user]);
 
@@ -108,25 +113,113 @@ export default function EnterpriseVanBookingSystem() {
 
   if (loading) return <div className="flex min-h-screen items-center justify-center bg-slate-950 text-white text-xs">Loading...</div>;
 
+  // 🎨 ส่วนหน้าจอ Login (Split Screen)
   if (!user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#f1f5f9] p-4 text-xs">
-        <div className="w-full max-w-md bg-white rounded-2xl p-8 shadow-2xl border">
-          <div className="text-center mb-6">
-            <h2 className="text-base font-black text-slate-900">ระบบจองรถตู้พนักงานบริษัท แอร์โรเฟลกซ์ จำกัด</h2>
-            <p className="text-slate-400 text-[11px] mt-1">กรุณาเข้าสู่ระบบด้วยบัญชีพนักงานองค์กร</p>
+      <div className="flex min-h-screen w-full bg-slate-100 p-4 md:p-8 items-center justify-center">
+        <div className="flex w-full max-w-4xl overflow-hidden rounded-3xl bg-white shadow-2xl border border-slate-100">
+          
+          {/* 🔷 ฝั่งซ้าย: Gradient สีองค์กร */}
+          <div className="hidden w-1/2 flex-col justify-between bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 p-10 text-white md:flex">
+            <div className="flex items-center gap-2.5 font-bold tracking-wider text-blue-400">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/20 text-blue-400 border border-blue-400/30">
+                <Bus className="h-5 w-5" />
+              </div>
+              <span className="text-base font-extrabold text-white">AEROFLEX</span>
+            </div>
+
+            <div className="space-y-3">
+              <span className="inline-block rounded-full bg-blue-500/10 px-3 py-1 text-[11px] font-semibold text-blue-300 border border-blue-500/20">
+                Enterprise Transportation
+              </span>
+              <h1 className="text-2xl font-black leading-snug tracking-tight">
+                ระบบจองรถตู้พนักงาน
+              </h1>
+              <p className="text-xs font-light text-slate-300 leading-relaxed">
+                บริษัท แอร์โรเฟลกซ์ จำกัด — ยกระดับความสะดวกสบายในการเดินทาง รวดเร็ว ปลอดภัย และแม่นยำ
+              </p>
+            </div>
+
+            <div className="text-[11px] text-slate-400">
+              © AEROFLEX CO., LTD. ALL RIGHTS RESERVED.
+            </div>
           </div>
-          <form onSubmit={async (e) => {
-            e.preventDefault(); setLoginError(''); setIsLoggingIn(true);
-            try { await signInWithEmailAndPassword(auth, email, password); } 
-            catch { setLoginError('อีเมลหรือรหัสผ่านไม่ถูกต้อง'); } 
-            finally { setIsLoggingIn(false); }
-          }} className="space-y-4">
-            {loginError && <div className="text-red-500 text-center font-bold bg-red-50 p-2.5 rounded-xl">{loginError}</div>}
-            <input type="email" placeholder="name@company.com" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full border p-3 rounded-xl bg-slate-50 text-slate-900 focus:outline-none" required />
-            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full border p-3 rounded-xl bg-slate-50 text-slate-900 focus:outline-none" required />
-            <button type="submit" className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl transition-all" disabled={isLoggingIn}>{isLoggingIn ? 'กำลังตรวจสอบ...' : 'เข้าสู่ระบบ'}</button>
-          </form>
+
+          {/* ⬜ ฝั่งขวา: ฟอร์ม Login */}
+          <div className="flex w-full flex-col justify-center p-8 md:w-1/2 md:p-12">
+            <div className="mb-6 space-y-1">
+              <h2 className="text-xl font-bold text-slate-900">เข้าสู่ระบบ</h2>
+              <p className="text-xs text-slate-500">
+                กรุณากรอกข้อมูลบัญชีพนักงานเพื่อเข้าสู่ระบบ
+              </p>
+            </div>
+
+            <form 
+              onSubmit={async (e) => {
+                e.preventDefault(); 
+                setLoginError(''); 
+                setIsLoggingIn(true);
+                try { 
+                  await signInWithEmailAndPassword(auth, email, password); 
+                } catch { 
+                  setLoginError('อีเมลหรือรหัสผ่านไม่ถูกต้อง'); 
+                } finally { 
+                  setIsLoggingIn(false); 
+                }
+              }} 
+              className="space-y-4"
+            >
+              {loginError && (
+                <div className="flex items-center gap-2 rounded-xl bg-red-50 p-3 text-xs font-medium text-red-600 border border-red-100">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{loginError}</span>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">อีเมลองค์กร</label>
+                <div className="relative">
+                  <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input 
+                    type="email" 
+                    placeholder="name@company.com" 
+                    value={email} 
+                    onChange={(e) => setEmail(e.target.value)} 
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-3 text-xs text-slate-900 outline-none transition focus:border-slate-900 focus:bg-white focus:ring-1 focus:ring-slate-900" 
+                    required 
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700">รหัสผ่าน</label>
+                <div className="relative">
+                  <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input 
+                    type="password" 
+                    placeholder="••••••••" 
+                    value={password} 
+                    onChange={(e) => setPassword(e.target.value)} 
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2.5 pl-10 pr-3 text-xs text-slate-900 outline-none transition focus:border-slate-900 focus:bg-white focus:ring-1 focus:ring-slate-900" 
+                    required 
+                  />
+                </div>
+              </div>
+
+              <button 
+                type="submit" 
+                className="w-full rounded-xl bg-slate-900 py-3 text-xs font-bold text-white shadow-md transition hover:bg-slate-800 active:scale-[0.98] disabled:opacity-50" 
+                disabled={isLoggingIn}
+              >
+                {isLoggingIn ? 'กำลังตรวจสอบ...' : 'เข้าสู่ระบบ'}
+              </button>
+            </form>
+
+            <div className="mt-8 text-center text-[11px] text-slate-400">
+              พบปัญหาการใช้งาน ติดต่อ <span className="font-semibold text-slate-600 underline cursor-pointer">Admin</span>
+            </div>
+          </div>
+
         </div>
       </div>
     );
@@ -204,7 +297,7 @@ export default function EnterpriseVanBookingSystem() {
               db={db} user={user} theme={theme} showAlert={showAlert}
               routesList={routesList} bookingsList={bookingsList} announcementsList={announcementsList} 
               supportTicketsList={ticketsList}
-              adHocRequestsList={adHocRequestsList} // <--- ส่ง adHocRequestsList เข้า AdminView ที่นี่
+              adHocRequestsList={adHocRequestsList}
             />
           ) : (
             <UserView 
