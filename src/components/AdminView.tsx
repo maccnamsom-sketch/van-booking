@@ -1,19 +1,22 @@
 'use client';
 
-import React, { useState } from 'react';
-import { collection, doc, updateDoc, addDoc, deleteDoc, arrayUnion } from 'firebase/firestore';
+import React, { useState, useEffect } from 'react';
+import { collection, doc, updateDoc, addDoc, deleteDoc, arrayUnion, onSnapshot, setDoc } from 'firebase/firestore';
 
 interface AdminViewProps {
   db: any;
   user: any;
-  theme: any;
-  routesList: any[];
-  bookingsList: any[];
-  announcementsList: any[];
+  theme?: any;
+  routesList?: any[];
+  bookingsList?: any[];
+  announcementsList?: any[];
   supportTicketsList?: any[];
   cancellationRequestsList?: any[]; 
+  adHocRequestsList?: any[]; 
   showAlert: (type: 'success' | 'warning' | 'error' | 'info', title: string, message: string, onConfirm?: () => void, showCancel?: boolean) => void;
 }
+
+type SystemControlMode = 'AUTO' | 'FORCE_OPEN' | 'FORCE_CLOSE';
 
 export default function AdminView({ 
   db, 
@@ -24,12 +27,23 @@ export default function AdminView({
   announcementsList = [], 
   supportTicketsList = [], 
   cancellationRequestsList = [], 
+  adHocRequestsList = [], 
   showAlert 
 }: AdminViewProps) {
   
-  const [adminTab, setAdminTab] = useState<'overview' | 'routes' | 'announcements' | 'tickets' | 'cancellation'>('overview');
+  // Navigation Tabs
+  const [adminTab, setAdminTab] = useState<'overview' | 'routes' | 'announcements' | 'tickets' | 'cancellation' | 'adhoc'>('overview');
   const [ticketSubTab, setTicketSubTab] = useState<'Pending' | 'Processing' | 'Resolved'>('Pending');
+  const [adhocSubTab, setAdhocSubTab] = useState<'All' | 'Pending' | 'Approved' | 'Rejected'>('All');
 
+  // Control System States
+  const [controlMode, setControlMode] = useState<SystemControlMode>('AUTO');
+
+  // Reject Reasoning
+  const [rejectReasonInputs, setRejectReasonInputs] = useState<{ [id: string]: string }>({});
+  const [rejectingId, setRejectingId] = useState<string | null>(null);
+
+  // Filters
   const [adminRouteFilter, setAdminRouteFilter] = useState<'Day' | 'Shift'>('Day');
 
   const getTodayDateString = () => {
@@ -44,40 +58,151 @@ export default function AdminView({
   const [selectedOverviewDate, setSelectedOverviewDate] = useState<string>(todayStr);
   const [selectedShiftTypeFilter, setSelectedShiftTypeFilter] = useState<string>('ALL');
 
+  // Route Form States
   const [editingRouteId, setEditingRouteId] = useState<string | null>(null);
   const [newRouteName, setNewRouteName] = useState('');
   const [newRoutePlate, setNewRoutePlate] = useState('');
   const [newRouteDriver, setNewRouteDriver] = useState('');
   const [newRoutePhone, setNewRoutePhone] = useState('');
-  
   const [newRouteShift, setNewRouteShift] = useState<'Day' | 'Shift'>('Day');
 
   const [stationInput, setStationInput] = useState('');
   const [timeInput, setTimeInput] = useState('');
   const [stopsList, setStopsList] = useState<{ station: string; time: string }[]>([]);
 
+  // Announcement Form States
   const [newAnnounceTitle, setNewAnnounceTitle] = useState('');
   const [newAnnounceContent, setNewAnnounceContent] = useState('');
 
+  // Support Chat States
   const [replyMessages, setReplyMessages] = useState<{ [ticketId: string]: string }>({}); 
-  const [, setUpdatingTicketId] = useState<string | null>(null);
+  const [updatingTicketId, setUpdatingTicketId] = useState<string | null>(null);
 
+  // -------------------------------------------------------------
+  // ระบบตั้งเวลา และ Manual Override (เปิด/ปิด จองรถ)
+  // -------------------------------------------------------------
+  useEffect(() => {
+    if (!db) return;
+    const sysControlRef = doc(db, 'system_settings', 'booking_control');
+    const unsubscribe = onSnapshot(sysControlRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.mode) {
+          setControlMode(data.mode as SystemControlMode);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, [db]);
+
+  const checkAutoSchedule = () => {
+    const now = new Date();
+    const currentHour = now.getHours();
+    return currentHour >= 8 && currentHour < 16;
+  };
+
+  const isAutoOpen = checkAutoSchedule();
+  const autoStatusText = isAutoOpen 
+    ? 'อยู่ในเวลาทำการ (08:00 - 16:00 น.)' 
+    : 'นอกเวลาทำการ (ปิดอัตโนมัติ 16:00 - 08:00 น.)';
+
+  const isCurrentlyOpen = controlMode === 'FORCE_OPEN' 
+    ? true 
+    : controlMode === 'FORCE_CLOSE' 
+    ? false 
+    : isAutoOpen;
+
+  const handleUpdateControlMode = async (newMode: SystemControlMode) => {
+    try {
+      setControlMode(newMode);
+      
+      const isAuto = checkAutoSchedule();
+      let openStatus = false;
+      let reasonText = '';
+
+      if (newMode === 'FORCE_OPEN') {
+        openStatus = true;
+      } else if (newMode === 'FORCE_CLOSE') {
+        openStatus = false;
+        reasonText = 'ระบบปิดรับการจองชั่วคราวโดยผู้ดูแลระบบ';
+      } else {
+        openStatus = isAuto;
+        reasonText = isAuto ? '' : 'ระบบปิดรับการจองนอกเวลาทำการ (เปิดรับจองเวลา 08:00 - 16:00 น.)';
+      }
+
+      const sysControlRef = doc(db, 'system_settings', 'booking_control');
+      await setDoc(sysControlRef, {
+        mode: newMode,
+        isCurrentlyOpen: openStatus,
+        closeReason: reasonText,
+        updatedBy: user?.email || user?.displayName || 'Admin',
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+
+      const modeText = newMode === 'AUTO' ? 'โหมดอัตโนมัติ' : newMode === 'FORCE_OPEN' ? 'เปิดการจองฉุกเฉิน' : 'ปิดการจองฉุกเฉิน';
+      showAlert('success', 'อัปเดตระบบสำเร็จ', `เปลี่ยนโหมดควบคุมเป็น "${modeText}" เรียบร้อยแล้ว`);
+    } catch {
+      showAlert('error', 'ผิดพลาด', 'ไม่สามารถบันทึกการตั้งค่าโหมดการจองลงฐานข้อมูลได้');
+    }
+  };
+
+  // Lists Processing
   const combinedCancelRequests = [
     ...cancellationRequestsList,
-    ...supportTicketsList.filter(t => t.status === 'CancelRequested' || t.status === 'รอยยกเลิกคำร้อง')
+    ...supportTicketsList.filter(t => {
+      const st = (t.status || '').toLowerCase();
+      return st.includes('cancel') || st.includes('ยกเลิก');
+    })
   ];
 
-  const pendingTicketsCount = supportTicketsList.filter(t => t.status === 'Pending').length;
-  const processingTicketsCount = supportTicketsList.filter(t => t.status === 'Processing').length;
-  const resolvedTicketsCount = supportTicketsList.filter(t => t.status === 'Resolved').length;
-  const cancelRequestsCount = combinedCancelRequests.length;
+  const pendingTicketsCount = supportTicketsList.filter(t => {
+    const st = (t.status || 'pending').toLowerCase();
+    return st === 'pending' || st.includes('รอ') || (!t.status && ticketSubTab === 'Pending');
+  }).length;
 
-  const filteredTickets = supportTicketsList.filter(t => t.status === ticketSubTab);
+  const processingTicketsCount = supportTicketsList.filter(t => {
+    const st = (t.status || '').toLowerCase();
+    return st === 'processing' || st.includes('กำลัง') || st.includes('ตรวจสอบ');
+  }).length;
+
+  const resolvedTicketsCount = supportTicketsList.filter(t => {
+    const st = (t.status || '').toLowerCase();
+    return st === 'resolved' || st === 'completed' || st.includes('เรียบร้อย');
+  }).length;
+
+  const cancelRequestsCount = combinedCancelRequests.length;
+  
+  const pendingAdHocCount = adHocRequestsList.filter(r => !r.status || r.status === 'Pending').length;
+  const approvedAdHocCount = adHocRequestsList.filter(r => r.status === 'Approved').length;
+  const rejectedAdHocCount = adHocRequestsList.filter(r => r.status === 'Rejected').length;
+
+  const filteredAdHocList = adHocRequestsList.filter(r => {
+    const st = r.status || 'Pending';
+    if (adhocSubTab === 'All') return true;
+    if (adhocSubTab === 'Pending') return st === 'Pending';
+    if (adhocSubTab === 'Approved') return st === 'Approved';
+    if (adhocSubTab === 'Rejected') return st === 'Rejected';
+    return true;
+  });
+
+  const filteredTickets = supportTicketsList.filter(t => {
+    const st = (t.status || 'pending').toLowerCase();
+    if (ticketSubTab === 'Pending') {
+      return st === 'pending' || st.includes('รอ') || (!t.status);
+    }
+    if (ticketSubTab === 'Processing') {
+      return st === 'processing' || st.includes('กำลัง') || st.includes('ตรวจสอบ');
+    }
+    if (ticketSubTab === 'Resolved') {
+      return st === 'resolved' || st === 'completed' || st.includes('เรียบร้อย');
+    }
+    return true;
+  });
 
   const filteredAdminRoutes = routesList.filter(r => {
-    if (!r.shiftType && !r.shift) return adminRouteFilter === 'Day';
-    const type = r.shiftType || r.shift;
-    if (type === 'All') return adminRouteFilter === 'Day';
+    const type = r.shiftType || r.shift || 'Day';
+    if (type === 'All') return true;
     return type === adminRouteFilter;
   });
 
@@ -91,6 +216,7 @@ export default function AdminView({
     return `${dd}/${mm}/${yyyy}`;
   };
 
+  // Stop handlers
   const handleAddStop = () => {
     if (!stationInput || !timeInput) return;
     setStopsList(prev => [...prev, { station: stationInput, time: timeInput }]);
@@ -137,7 +263,8 @@ export default function AdminView({
         shift: newRouteShift,
         stops: stopsList,
         stations: stopsList,
-        totalSeats: 14
+        totalSeats: 14,
+        updatedBy: user?.email || user?.displayName || 'Admin'
       };
 
       if (editingRouteId) {
@@ -172,6 +299,7 @@ export default function AdminView({
         title: newAnnounceTitle,
         desc: newAnnounceContent,
         content: newAnnounceContent,
+        createdBy: user?.email || user?.displayName || 'Admin',
         timestamp: new Date().toISOString()
       });
       showAlert('success', 'สำเร็จ', 'เพิ่มประกาศใหม่เรียบร้อยแล้ว');
@@ -209,7 +337,7 @@ export default function AdminView({
           sender: 'admin',
           text: textToReply,
           timestamp: new Date().toISOString(),
-          repliedBy: user?.email || 'admin@company.com'
+          repliedBy: user?.email || user?.displayName || 'Admin'
         })
       });
       setReplyMessages(prev => ({ ...prev, [ticketId]: '' }));
@@ -222,7 +350,10 @@ export default function AdminView({
 
   const handleUpdateTicketStatus = async (ticketId: string, newStatus: string) => {
     try {
-      await updateDoc(doc(db, 'support_tickets', ticketId), { status: newStatus });
+      await updateDoc(doc(db, 'support_tickets', ticketId), { 
+        status: newStatus,
+        updatedBy: user?.email || user?.displayName || 'Admin'
+      });
       showAlert('success', 'อัปเดตสถานะสำเร็จ', `ย้ายใบงานแจ้งปัญหาไปยังหมวดหมู่ใหม่เรียบร้อยแล้ว`);
     } catch {
       showAlert('error', 'เกิดข้อผิดพลาด', 'ไม่สามารถเปลี่ยนสถานะของใบงานแจ้งปัญหาได้');
@@ -254,13 +385,37 @@ export default function AdminView({
     }, true);
   };
 
-  let filteredBookingsByDate = selectedOverviewDate 
-    ? bookingsList.filter(b => b.travelDate === selectedOverviewDate)
-    : bookingsList;
+  const handleApproveAdHoc = async (requestId: string, status: 'Approved' | 'Rejected') => {
+    try {
+      const updatePayload: any = { 
+        status,
+        approvedBy: user?.email || user?.displayName || 'Admin',
+        approvedAt: new Date().toISOString()
+      };
+      if (status === 'Rejected') {
+        const reasonText = rejectReasonInputs[requestId] || 'ไม่ระบุเหตุผล';
+        updatePayload.adminRejectReason = reasonText;
+      }
+      await updateDoc(doc(db, 'shiftRequests', requestId), updatePayload);
+      showAlert('success', 'สำเร็จ', status === 'Approved' ? 'อนุมัติคำขอเปลี่ยนเวลาเรียบร้อยแล้ว' : 'ปฏิเสธคำขอเรียบร้อยแล้ว');
+      setRejectingId(null);
+    } catch {
+      showAlert('error', 'ผิดพลาด', 'ไม่สามารถอัปเดตสถานะคำขอได้');
+    }
+  };
 
-  if (selectedShiftTypeFilter !== 'ALL') {
-    filteredBookingsByDate = filteredBookingsByDate.filter(b => b.shiftType === selectedShiftTypeFilter || b.shift === selectedShiftTypeFilter);
-  }
+  let filteredBookingsByDate = bookingsList.filter(b => {
+    const travelDate = (b.travelDate || b.date || '').trim();
+    const matchDate = !selectedOverviewDate || travelDate === selectedOverviewDate;
+
+    if (!matchDate) return false;
+
+    if (selectedShiftTypeFilter !== 'ALL') {
+      const bShift = b.shiftType || b.shift || 'Day';
+      return bShift === selectedShiftTypeFilter;
+    }
+    return true;
+  });
 
   const handlePrintPDF = () => {
     window.print();
@@ -269,13 +424,106 @@ export default function AdminView({
   return (
     <div className="text-sm text-slate-800 dark:text-slate-100 max-w-6xl mx-auto space-y-6">
       
-      {/* Navigation Tabs - ครบทั้ง 5 แท็บ */}
+      {/* 🟢 PANEL ควบคุมการเปิด-ปิดระบบจองรถตู้ */}
+      <div className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 print:hidden">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
+          <div>
+            <h3 className="font-bold text-base text-slate-900 dark:text-white flex items-center gap-2">
+              ⏱️ ควบคุมระบบเปิด-ปิดการจองรถตู้
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              ระบบตั้งเวลาอัตโนมัติ: ปิดรับจองช่วง <strong className="text-slate-700 dark:text-slate-300">16:00 - 08:00 น.</strong> ของวันถัดไป
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400 font-bold uppercase">สถานะปัจจุบัน:</span>
+            {isCurrentlyOpen ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800 animate-pulse">
+                🟢 เปิดรับการจอง
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-red-50 text-red-700 border border-red-200 dark:bg-red-950/50 dark:text-red-300 dark:border-red-800">
+                🔒 ปิดรับการจอง
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <button
+            type="button"
+            onClick={() => handleUpdateControlMode('AUTO')}
+            className={`p-3.5 rounded-xl border flex flex-col justify-between transition-all text-left cursor-pointer ${
+              controlMode === 'AUTO'
+                ? 'border-blue-600 bg-blue-50/60 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200 ring-2 ring-blue-500/20'
+                : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300'
+            }`}
+          >
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <span className="font-extrabold text-xs uppercase">🕒 อัตโนมัติ (Auto)</span>
+                {controlMode === 'AUTO' && <span className="text-[10px] bg-blue-600 text-white font-bold px-1.5 py-0.5 rounded">ใช้งานอยู่</span>}
+              </div>
+              <p className="text-[11px] opacity-80">เปิดจอง 08:00 - 16:00 น. อัตโนมัติ</p>
+            </div>
+            <span className="mt-2 text-[10px] font-bold text-blue-600 dark:text-blue-400">
+              {autoStatusText}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleUpdateControlMode('FORCE_OPEN')}
+            className={`p-3.5 rounded-xl border flex flex-col justify-between transition-all text-left cursor-pointer ${
+              controlMode === 'FORCE_OPEN'
+                ? 'border-emerald-600 bg-emerald-50/60 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200 ring-2 ring-emerald-500/20'
+                : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300'
+            }`}
+          >
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <span className="font-extrabold text-xs uppercase">⚡ เปิดการจองฉุกเฉิน</span>
+                {controlMode === 'FORCE_OPEN' && <span className="text-[10px] bg-emerald-600 text-white font-bold px-1.5 py-0.5 rounded">ใช้งานอยู่</span>}
+              </div>
+              <p className="text-[11px] opacity-80">บังคับเปิดทันที แม้หลัง 16:00 น.</p>
+            </div>
+            <span className="mt-2 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+              Manual Force Open
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleUpdateControlMode('FORCE_CLOSE')}
+            className={`p-3.5 rounded-xl border flex flex-col justify-between transition-all text-left cursor-pointer ${
+              controlMode === 'FORCE_CLOSE'
+                ? 'border-red-600 bg-red-50/60 dark:bg-red-950/40 text-red-900 dark:text-red-200 ring-2 ring-red-500/20'
+                : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300'
+            }`}
+          >
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <span className="font-extrabold text-xs uppercase">🚫 ปิดการจองฉุกเฉิน</span>
+                {controlMode === 'FORCE_CLOSE' && <span className="text-[10px] bg-red-600 text-white font-bold px-1.5 py-0.5 rounded">ใช้งานอยู่</span>}
+              </div>
+              <p className="text-[11px] opacity-80">บังคับปิดทันที แม้อยู่นอกเวลาทำการ</p>
+            </div>
+            <span className="mt-2 text-[10px] font-bold text-red-600 dark:text-red-400">
+              Manual Force Close
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* Navigation Tabs */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 gap-2 overflow-x-auto pb-px print:hidden">
         <button onClick={() => setAdminTab('overview')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap cursor-pointer ${adminTab === 'overview' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>📊 สรุปภาพรวมการจอง</button>
         <button onClick={() => setAdminTab('routes')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap cursor-pointer ${adminTab === 'routes' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>🚌 จัดการสายรถตู้ ({routesList.length})</button>
         <button onClick={() => setAdminTab('announcements')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap cursor-pointer ${adminTab === 'announcements' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>📢 จัดการประกาศข่าว ({announcementsList.length})</button>
         <button onClick={() => setAdminTab('tickets')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${adminTab === 'tickets' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>📬 กล่องข้อความแจ้งปัญหา {pendingTicketsCount > 0 && (<span className="bg-red-500 text-white text-[10px] h-4 px-1.5 rounded-full flex items-center justify-center font-bold animate-pulse">{pendingTicketsCount}</span>)}</button>
         <button onClick={() => setAdminTab('cancellation')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${adminTab === 'cancellation' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>❌ คำขอยกเลิกการจอง {cancelRequestsCount > 0 && (<span className="bg-amber-500 text-white text-[10px] h-4 px-1.5 rounded-full flex items-center justify-center font-bold">{cancelRequestsCount}</span>)}</button>
+        <button onClick={() => setAdminTab('adhoc')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${adminTab === 'adhoc' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>🕒 คำขอเปลี่ยนกะ/ออกก่อน {pendingAdHocCount > 0 && (<span className="bg-blue-600 text-white text-[10px] h-4 px-1.5 rounded-full flex items-center justify-center font-bold">{pendingAdHocCount}</span>)}</button>
       </div>
 
       {/* 1. OVERVIEW TAB */}
@@ -338,8 +586,14 @@ export default function AdminView({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {routesList.map((route) => {
                 const routeBookings = filteredBookingsByDate.filter(b => {
-                  const matchRoute = b.route === route.name;
-                  const matchShift = !route.shiftType || route.shiftType === 'All' || b.shiftType === route.shiftType || b.shift === route.shiftType;
+                  const bRoute = (b.route || b.routeName || '').trim();
+                  const rName = (route.name || '').trim();
+                  const matchRoute = bRoute === rName;
+
+                  const rShift = route.shiftType || route.shift || 'Day';
+                  const bShift = b.shiftType || b.shift || 'Day';
+
+                  const matchShift = rShift === 'All' || bShift === rShift;
                   return matchRoute && matchShift;
                 });
                 
@@ -365,25 +619,57 @@ export default function AdminView({
                     ) : (
                       <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                         {routeBookings.map((b, bIdx) => {
-                          const isDayShift = (b.shiftType || b.shift) === 'Day';
+                          // 🌟 🔥 [จุดแก้ไขหลัก] เช็คว่าพนักงานคนนี้มี Ad-Hoc Request ที่ Approved ในวันนี้หรือไม่
+                          const empEmail = (b.employeeEmail || '').toLowerCase();
+                          const empName = (b.employeeName || b.name || '').trim();
+                          const bookingDate = (b.travelDate || b.date || '').trim();
+
+                          const approvedAdHoc = adHocRequestsList.find(adhoc => {
+                            const isStatusApproved = adhoc.status === 'Approved';
+                            const matchDate = (adhoc.requestDate || adhoc.date || '').trim() === bookingDate;
+                            const matchUser = 
+                              (adhoc.employeeEmail && adhoc.employeeEmail.toLowerCase() === empEmail) ||
+                              (adhoc.employeeName && adhoc.employeeName.trim() === empName);
+
+                            return isStatusApproved && matchDate && matchUser;
+                          });
+
+                          // กำหนดค่ากะ/เวลาที่จะนำมาแสดงผล
+                          const displayShiftType = approvedAdHoc?.requestedShift || b.shiftType || b.shift || 'Day';
+                          const displayTimeSlot = approvedAdHoc?.requestedTime 
+                            ? `(${approvedAdHoc.requestedTime} น. - พิเศษ)` 
+                            : (b.shiftTimeSlot ? `(${b.shiftTimeSlot})` : '(08:00 - 17:00)');
+
+                          const isAdHocApproved = !!approvedAdHoc;
+                          const isDayShift = displayShiftType === 'Day';
+
                           return (
                             <div key={b.id || bIdx} className="flex justify-between items-start bg-slate-50 dark:bg-slate-950 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 text-xs">
                               <div className="space-y-1">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-bold text-slate-800 dark:text-slate-100">{bIdx + 1}. {b.employeeName}</span>
-                                  {b.shiftType && (
-                                    <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${
-                                      isDayShift 
+                                  <span className="font-bold text-slate-800 dark:text-slate-100">
+                                    {bIdx + 1}. {b.employeeName || b.name || b.employeeEmail}
+                                  </span>
+                                  
+                                  {/* 🏷️ ป้ายแสดงสถานะกะ/เวลาแบบอัปเดตอัตโนมัติ */}
+                                  <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold border ${
+                                    isAdHocApproved
+                                      ? 'bg-amber-50 text-amber-700 border-amber-300 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800'
+                                      : isDayShift 
                                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900' 
                                         : 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900'
-                                    }`}>
-                                      {b.shiftType} {b.shiftTimeSlot ? `(${b.shiftTimeSlot})` : ''}
-                                    </span>
-                                  )}
+                                  }`}>
+                                    {isAdHocApproved && '⚡ '}
+                                    {displayShiftType} {displayTimeSlot}
+                                  </span>
                                 </div>
-                                <span className="block text-[11px] text-slate-400">จุดรับ: {b.pickupLocation} ({b.time} น.) | เดินทาง: {formatThaiDate(b.travelDate)}</span>
+                                <span className="block text-[11px] text-slate-400">
+                                  จุดรับ: {b.pickupLocation || b.station} ({b.time || ''} น.) | เดินทาง: {formatThaiDate(b.travelDate || b.date)}
+                                </span>
                               </div>
-                              <span className="font-mono text-xs font-semibold text-slate-600 dark:text-slate-300 mt-0.5">{b.employeePhone || '-'}</span>
+                              <span className="font-mono text-xs font-semibold text-slate-600 dark:text-slate-300 mt-0.5">
+                                {b.employeePhone || b.phone || '-'}
+                              </span>
                             </div>
                           );
                         })}
@@ -475,13 +761,13 @@ export default function AdminView({
                   onClick={() => setAdminRouteFilter('Day')}
                   className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${adminRouteFilter === 'Day' ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}
                 >
-                  ☀️ กะ Day ({routesList.filter(r => !r.shiftType && !r.shift || r.shiftType === 'Day' || r.shift === 'Day' || r.shiftType === 'All').length})
+                  ☀️ กะ Day ({routesList.filter(r => { const t = r.shiftType || r.shift || 'Day'; return t === 'Day' || t === 'All'; }).length})
                 </button>
                 <button 
                   onClick={() => setAdminRouteFilter('Shift')}
                   className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${adminRouteFilter === 'Shift' ? 'bg-purple-600 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}
                 >
-                  🌙 กะ Shift ({routesList.filter(r => r.shiftType === 'Shift' || r.shift === 'Shift').length})
+                  🌙 กะ Shift ({routesList.filter(r => { const t = r.shiftType || r.shift; return t === 'Shift'; }).length})
                 </button>
               </div>
             </div>
@@ -541,7 +827,11 @@ export default function AdminView({
             <h3 className="text-xs font-black text-slate-500 uppercase tracking-wider">📄 ประวัติและรายการประกาศข่าวสารประชาสัมพันธ์</h3>
             {announcementsList.map(a => (
               <div key={a.id} className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl flex justify-between items-start gap-4 shadow-sm">
-                <div className="space-y-1"><h4 className="font-bold text-slate-900 dark:text-white">{a.title}</h4><p className="text-xs text-slate-500 dark:text-slate-300 leading-relaxed">{a.desc || a.content}</p><span className="block text-[10px] text-slate-400 font-mono">เมื่อ: {a.timestamp ? new Date(a.timestamp).toLocaleString('th-TH') : ''}</span></div>
+                <div className="space-y-1">
+                  <h4 className="font-bold text-slate-900 dark:text-white">{a.title}</h4>
+                  <p className="text-xs text-slate-500 dark:text-slate-300 leading-relaxed">{a.desc || a.content}</p>
+                  <span className="block text-[10px] text-slate-400 font-mono">เมื่อ: {a.timestamp ? new Date(a.timestamp).toLocaleString('th-TH') : ''} {a.createdBy ? `โดย: ${a.createdBy}` : ''}</span>
+                </div>
                 <button onClick={() => handleDeleteAnnouncement(a.id)} className="text-red-500 hover:bg-red-50 text-xs px-2.5 py-1.5 rounded-lg font-bold cursor-pointer">ลบ</button>
               </div>
             ))}
@@ -589,7 +879,7 @@ export default function AdminView({
                     <div className="bg-slate-50 dark:bg-slate-950 p-4 rounded-xl space-y-3 max-h-64 overflow-y-auto">
                       {ticket.messages?.map((msg: any, mIdx: number) => (
                         <div key={mIdx} className={`flex flex-col ${msg.sender === 'admin' ? 'items-end' : 'items-start'}`}>
-                          <span className="text-[9px] text-slate-400 mb-0.5">{msg.sender === 'admin' ? 'คุณ (แอดมิน)' : 'พนักงาน'}</span>
+                          <span className="text-[9px] text-slate-400 mb-0.5">{msg.sender === 'admin' ? `คุณ (${user?.email || 'Admin'})` : 'พนักงาน'}</span>
                           <div className={`max-w-[85%] rounded-2xl px-3.5 py-2 text-xs ${msg.sender === 'admin' ? 'bg-slate-900 text-white dark:bg-blue-600 rounded-tr-none' : 'bg-white dark:bg-slate-800 rounded-tl-none border border-slate-200 dark:border-slate-700'}`}>{msg.text}</div>
                         </div>
                       ))}
@@ -636,6 +926,98 @@ export default function AdminView({
                   </div>
                 </div>
               ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 6. AD-HOC REQUESTS TAB */}
+      {adminTab === 'adhoc' && (
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+            <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest">🕒 ตรวจสอบและอนุมัติคำขอเปลี่ยนกะ / ออกก่อนเวลาพนักงาน</h3>
+            <span className="text-xs text-slate-400">ทั้งหมด {adHocRequestsList.length} รายการ</span>
+          </div>
+
+          <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-xl w-fit border border-slate-200 dark:border-slate-800/60">
+            <button onClick={() => setAdhocSubTab('All')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${adhocSubTab === 'All' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500'}`}>📋 ทั้งหมด ({adHocRequestsList.length})</button>
+            <button onClick={() => setAdhocSubTab('Pending')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${adhocSubTab === 'Pending' ? 'bg-white dark:bg-slate-900 text-blue-600 shadow-sm' : 'text-slate-500'}`}>🔵 รอดำเนินการ ({pendingAdHocCount})</button>
+            <button onClick={() => setAdhocSubTab('Approved')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${adhocSubTab === 'Approved' ? 'bg-white dark:bg-slate-900 text-emerald-600 shadow-sm' : 'text-slate-500'}`}>✅ อนุมัติแล้ว ({approvedAdHocCount})</button>
+            <button onClick={() => setAdhocSubTab('Rejected')} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${adhocSubTab === 'Rejected' ? 'bg-white dark:bg-slate-900 text-red-600 shadow-sm' : 'text-slate-500'}`}>❌ ถูกปฏิเสธ ({rejectedAdHocCount})</button>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            {filteredAdHocList.length === 0 ? (
+              <div className="p-12 border border-dashed rounded-2xl text-center text-slate-400 border-slate-200 dark:border-slate-800">📭 ไม่มีรายการคำขอในหมวดหมู่นี้</div>
+            ) : (
+              filteredAdHocList.map((req) => {
+                const status = req.status || 'Pending';
+                const isRejectingThis = rejectingId === req.id;
+
+                return (
+                  <div key={req.id} className="p-5 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm space-y-4">
+                    <div className="flex justify-between items-start gap-4 border-b border-slate-200 dark:border-slate-800 pb-3">
+                      <div>
+                        <span className="text-[9px] text-slate-400 font-mono block">รหัสคำขอ: {req.id}</span>
+                        <h4 className="font-bold text-base text-blue-600 dark:text-blue-400">พนักงาน: {req.employeeName || req.employeeEmail}</h4>
+                        <p className="text-xs text-slate-500 mt-0.5">วันที่ต้องการเปลี่ยน: <strong className="text-slate-800 dark:text-slate-200 font-mono">{formatThaiDate(req.requestDate)}</strong></p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {status === 'Pending' ? (
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => handleApproveAdHoc(req.id, 'Approved')} className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md cursor-pointer">✅ อนุมัติ</button>
+                            <button onClick={() => setRejectingId(isRejectingThis ? null : req.id)} className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-md cursor-pointer">❌ ปฏิเสธ</button>
+                          </div>
+                        ) : (
+                          <span className={`text-xs font-bold px-3 py-1.5 rounded-xl border ${status === 'Approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900' : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-900'}`}>
+                            {status === 'Approved' ? '✅ อนุมัติแล้ว' : '❌ ถูกปฏิเสธ'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs bg-slate-50 dark:bg-slate-950 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">กะปกติในระบบ:</span>
+                        <p className="font-semibold text-slate-700 dark:text-slate-300 mt-0.5">{req.originalShift || '-'}</p>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">เวลาที่ขอออกจริง:</span>
+                        <p className="font-bold text-blue-600 dark:text-blue-400 mt-0.5 text-sm">{req.requestedTime || '-'} น.</p>
+                      </div>
+                      <div className="sm:col-span-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase block">เหตุผลความจำเป็นของพนักงาน:</span>
+                        <p className="text-slate-700 dark:text-slate-300 mt-1 bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800">{req.reason || 'ไม่ได้ระบุเหตุผล'}</p>
+                      </div>
+
+                      {status === 'Rejected' && req.adminRejectReason && (
+                        <div className="sm:col-span-2 pt-2 border-t border-red-200 dark:border-red-950">
+                          <span className="text-[10px] font-bold text-red-500 uppercase block">เหตุผลที่ไม่อนุมัติ (จากแอดมิน):</span>
+                          <p className="text-red-600 dark:text-red-400 mt-1 bg-red-50 dark:bg-red-950/30 p-2.5 rounded-lg border border-red-100 dark:border-red-900/50">{req.adminRejectReason}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {isRejectingThis && status === 'Pending' && (
+                      <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-xl space-y-3">
+                        <label className="block text-xs font-bold text-red-600 dark:text-red-400">กรุณาระบุเหตุผลที่ไม่สามารถอนุมัติได้ (เพื่อให้พนักงานรับทราบ):</label>
+                        <input 
+                          type="text" 
+                          placeholder="เช่น ขาดกำลังคนช่วงกะดึก, กรอกข้อมูลไม่ครบถ้วน..." 
+                          value={rejectReasonInputs[req.id] || ''} 
+                          onChange={(e) => setRejectReasonInputs({ ...rejectReasonInputs, [req.id]: e.target.value })} 
+                          className="w-full border border-red-300 dark:border-red-800 p-2.5 rounded-xl text-xs bg-white dark:bg-slate-900"
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button onClick={() => setRejectingId(null)} className="px-3 py-1.5 text-xs bg-slate-200 dark:bg-slate-800 rounded-lg font-bold cursor-pointer">ยกเลิก</button>
+                          <button onClick={() => handleApproveAdHoc(req.id, 'Rejected')} className="px-4 py-1.5 text-xs bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold shadow cursor-pointer">ยืนยันปฏิเสธคำขอ</button>
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
+                );
+              })
             )}
           </div>
         </div>

@@ -15,7 +15,8 @@ export default function EnterpriseVanBookingSystem() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [activeMenu, setActiveMenu] = useState<'home' | 'booking' | 'history' | 'qrcode' | 'admin'>('home');
+  // เพิ่ม 'shiftRequest' เข้าไปใน Type ของ activeMenu
+  const [activeMenu, setActiveMenu] = useState<'home' | 'booking' | 'history' | 'qrcode' | 'admin' | 'shiftRequest'>('home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // ตรวจสอบสิทธิ์ว่าเป็นแอดมินหรือไม่
@@ -42,6 +43,7 @@ export default function EnterpriseVanBookingSystem() {
   const [bookingsList, setBookingsList] = useState<any[]>([]);
   const [announcementsList, setAnnouncementsList] = useState<any[]>([]);
   const [ticketsList, setTicketsList] = useState<any[]>([]);
+  const [adHocRequestsList, setAdHocRequestsList] = useState<any[]>([]); // State สำหรับเก็บข้อมูลคำขอเปลี่ยนกะ
   const [recentBooking, setRecentBooking] = useState<any>(null);
 
   // Login Form States
@@ -77,12 +79,22 @@ export default function EnterpriseVanBookingSystem() {
       setTicketsList(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
+    // ดึงข้อมูลคำขอเปลี่ยนกะ / ออกก่อนเวลา จาก Collection 'shiftRequests'
+    const unsubscribeShiftRequests = onSnapshot(query(collection(db, 'shiftRequests')), (snapshot) => {
+      const list = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setAdHocRequestsList(list);
+    });
+
     return () => {
       unsubscribeAuth();
       unsubscribeRoutes();
       unsubscribeBookings();
       unsubscribeAnnounce();
       unsubscribeTickets();
+      unsubscribeShiftRequests(); // ยกเลิกการ subscribe เมื่อ component unmount
     };
   }, [user]);
 
@@ -154,6 +166,9 @@ export default function EnterpriseVanBookingSystem() {
           <nav className="mt-4 space-y-1 text-xs">
             <button onClick={() => { setActiveMenu('home'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-6 py-3 ${activeMenu === 'home' ? theme.menuActive : theme.menuInactive}`}>หน้าหลัก & ประกาศ</button>
             <button onClick={() => { setActiveMenu('booking'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-6 py-3 ${activeMenu === 'booking' ? theme.menuActive : theme.menuInactive}`}>ลงทะเบียนจองคิวรถตู้</button>
+            
+            <button onClick={() => { setActiveMenu('shiftRequest'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-6 py-3 ${activeMenu === 'shiftRequest' ? theme.menuActive : theme.menuInactive}`}>แจ้งขอเปลี่ยนกะ / ออกก่อนเวลา</button>
+            
             <button onClick={() => { setActiveMenu('history'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-6 py-3 ${activeMenu === 'history' ? theme.menuActive : theme.menuInactive}`}>ประวัติการเดินทาง</button>
             <button onClick={() => { setActiveMenu('qrcode'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-6 py-3 ${activeMenu === 'qrcode' ? theme.menuActive : theme.menuInactive}`}>คิวอาร์โค้ดเช็กอิน</button>
             
@@ -189,6 +204,7 @@ export default function EnterpriseVanBookingSystem() {
               db={db} user={user} theme={theme} showAlert={showAlert}
               routesList={routesList} bookingsList={bookingsList} announcementsList={announcementsList} 
               supportTicketsList={ticketsList}
+              adHocRequestsList={adHocRequestsList} // <--- ส่ง adHocRequestsList เข้า AdminView ที่นี่
             />
           ) : (
             <UserView 
