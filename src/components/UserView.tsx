@@ -432,7 +432,24 @@ export default function UserView({
             </div>
           )}
 
-          {/* 🌟 เมนูลัดขนาดใหญ่ สีดั้งเดิม (ย่อ Padding ให้กระชับขึ้นเพื่อให้เห็นกล่องต้อนรับด้านล่างพร้อมกัน) */}
+          {/* 🌟 กล่องข้อความต้อนรับสีน้ำเงินเข้ม (สลับขึ้นมาไว้ด้านบนสุด) */}
+          <div className="relative overflow-hidden bg-gradient-to-br from-blue-900 via-slate-900 to-slate-950 p-6 md:p-8 rounded-2xl text-white shadow-xl border border-slate-800">
+            <div className="relative z-10 max-w-2xl space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="bg-white/10 text-slate-200 text-[10px] font-semibold tracking-wider uppercase px-3 py-1 rounded-full backdrop-blur-md border border-white/10">Central Transport Hub</span>
+                <button 
+                  onClick={() => setShowSummaryModal(true)}
+                  className="bg-emerald-600/90 hover:bg-emerald-600 text-white text-[11px] font-medium px-3 py-1 rounded-full transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                >
+                  ตรวจสอบรายชื่อผู้เดินทางประจำวัน ({bookingsList.filter(b => b.travelDate === todayStr).length})
+                </button>
+              </div>
+              <h2 className="text-lg md:text-xl font-bold tracking-tight text-white">ระบบจองรถตู้พนักงานบริษัท แอร์โรเฟลกซ์ จำกัด</h2>
+              <p className="text-xs text-slate-300 font-normal leading-relaxed">ระบบสารสนเทศสำหรับการตรวจสอบข้อมูลเดินรถ ตารางเวลาสถานีรับส่ง และลงทะเบียนเพื่อสำรองที่นั่งพนักงานส่วนกลางขององค์กร (ตัดรอบจองเวลา 15.00 น.)</p>
+            </div>
+          </div>
+
+          {/* 🌟 เมนูลัดขนาดใหญ่ 4 สี (สลับลงมาไว้ด้านล่างกล่องต้อนรับ) */}
           <div className="bg-white dark:bg-slate-900 p-4.5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-md space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">เมนูลัดใช้งานด่วน (กดเลือกเมนูที่ต้องการได้ทันที)</h3>
@@ -495,22 +512,6 @@ export default function UserView({
                   <span className="text-[11px] text-fuchsia-100">อ่านระเบียบและวิธีจองรถ</span>
                 </div>
               </button>
-            </div>
-          </div>
-
-          <div className="relative overflow-hidden bg-gradient-to-br from-blue-900 via-slate-900 to-slate-950 p-6 md:p-8 rounded-2xl text-white shadow-xl border border-slate-800">
-            <div className="relative z-10 max-w-2xl space-y-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="bg-white/10 text-slate-200 text-[10px] font-semibold tracking-wider uppercase px-3 py-1 rounded-full backdrop-blur-md border border-white/10">Central Transport Hub</span>
-                <button 
-                  onClick={() => setShowSummaryModal(true)}
-                  className="bg-emerald-600/90 hover:bg-emerald-600 text-white text-[11px] font-medium px-3 py-1 rounded-full transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
-                >
-                  ตรวจสอบรายชื่อผู้เดินทางประจำวัน ({bookingsList.filter(b => b.travelDate === todayStr).length})
-                </button>
-              </div>
-              <h2 className="text-lg md:text-xl font-bold tracking-tight text-white">ระบบจองรถตู้พนักงานบริษัท แอร์โรเฟลกซ์ จำกัด</h2>
-              <p className="text-xs text-slate-300 font-normal leading-relaxed">ระบบสารสนเทศสำหรับการตรวจสอบข้อมูลเดินรถ ตารางเวลาสถานีรับส่ง และลงทะเบียนเพื่อสำรองที่นั่งพนักงานส่วนกลางขององค์กร (ตัดรอบจองเวลา 15.00 น.)</p>
             </div>
           </div>
 
