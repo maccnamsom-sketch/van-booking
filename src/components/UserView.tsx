@@ -374,7 +374,7 @@ export default function UserView({
     <div className="text-sm text-slate-800 dark:text-slate-100">
       
       {/* 🟢 TOP BAR: REALTIME CLOCK & STATUS */}
-      <div className="max-w-4xl mx-auto mb-5 px-4 py-2.5 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-xs flex items-center justify-between gap-3 transition-all">
+      <div className="max-w-4xl mx-auto mb-3.5 px-4 py-2 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-xs flex items-center justify-between gap-3 transition-all">
         
         <div className="flex items-center gap-2.5 flex-wrap">
           <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide border transition-all ${
@@ -420,7 +420,7 @@ export default function UserView({
 
       {/* 1. HOME TAB */}
       {activeMenu === 'home' && (
-        <div className="max-w-4xl mx-auto space-y-8">
+        <div className="max-w-4xl mx-auto space-y-5">
           
           {!isSystemOpen && (
             <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-2xl text-rose-700 dark:text-rose-300 flex items-center gap-3 shadow-sm animate-pulse">
@@ -432,81 +432,84 @@ export default function UserView({
             </div>
           )}
 
-          {/* 🌟 เมนูลัดขนาดใหญ่พิเศษ สำหรับผู้สูงอายุ / มือถือ (ปุ่มใหญ่ มองง่าย ชัดเจน) */}
-          <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-md space-y-3">
-            <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider text-center">เมนูลัดใช้งานด่วน (กดเลือกเมนูที่ต้องการได้ทันที)</h3>
+          {/* 🌟 เมนูลัดขนาดใหญ่ สีดั้งเดิม (ย่อ Padding ให้กระชับขึ้นเพื่อให้เห็นกล่องต้อนรับด้านล่างพร้อมกัน) */}
+          <div className="bg-white dark:bg-slate-900 p-4.5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-md space-y-3">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
+              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">เมนูลัดใช้งานด่วน (กดเลือกเมนูที่ต้องการได้ทันที)</h3>
+              <span className="text-[11px] text-slate-400">สำหรับพนักงาน</span>
+            </div>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* ปุ่มจองรถ */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {/* ปุ่มจองรถ (สีน้ำเงิน) */}
               <button 
                 onClick={() => setActiveMenu('booking')}
-                className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg transition-all active:scale-98 cursor-pointer text-left"
+                className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-all active:scale-98 cursor-pointer text-left border border-blue-500"
               >
-                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center text-2xl shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl shrink-0">
                   🚐
                 </div>
                 <div>
-                  <span className="block text-base font-black">ลงทะเบียนจองรถตู้</span>
-                  <span className="text-xs text-blue-100 opacity-90">กดเพื่อสำรองที่นั่งเดินทาง</span>
+                  <span className="block text-sm font-bold text-white">ลงทะเบียนจองรถตู้</span>
+                  <span className="text-[11px] text-blue-100">กดเพื่อสำรองที่นั่งเดินทาง</span>
                 </div>
               </button>
 
-              {/* ปุ่มประวัติ */}
+              {/* ปุ่มประวัติ (สีเขียว) */}
               <button 
                 onClick={() => setActiveMenu('history')}
-                className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg transition-all active:scale-98 cursor-pointer text-left"
+                className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-md transition-all active:scale-98 cursor-pointer text-left border border-emerald-500"
               >
-                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center text-2xl shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl shrink-0">
                   📋
                 </div>
                 <div>
-                  <span className="block text-base font-black">ประวัติการเดินทาง</span>
-                  <span className="text-xs text-emerald-100 opacity-90">ตรวจสอบตั๋วและประวัติจอง</span>
+                  <span className="block text-sm font-bold text-white">ประวัติการเดินทาง</span>
+                  <span className="text-[11px] text-emerald-100">ตรวจสอบตั๋วและประวัติจอง</span>
                 </div>
               </button>
 
-              {/* ปุ่มแจ้งเปลี่ยนกะ */}
+              {/* ปุ่มแจ้งเปลี่ยนกะ (สีส้ม) */}
               <button 
                 onClick={() => setActiveMenu('shiftRequest')}
-                className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-lg transition-all active:scale-98 cursor-pointer text-left"
+                className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white shadow-md transition-all active:scale-98 cursor-pointer text-left border border-amber-500"
               >
-                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center text-2xl shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl shrink-0">
                   🕒
                 </div>
                 <div>
-                  <span className="block text-base font-black">ขอเปลี่ยนกะ / ออกก่อน</span>
-                  <span className="text-xs text-amber-100 opacity-90">แจ้งเปลี่ยนเวลากะกระทันหัน</span>
+                  <span className="block text-sm font-bold text-white">ขอเปลี่ยนกะ / ออกก่อน</span>
+                  <span className="text-[11px] text-amber-100">แจ้งเปลี่ยนเวลากะกระทันหัน</span>
                 </div>
               </button>
 
-              {/* ปุ่มคู่มือ */}
+              {/* ปุ่มคู่มือ (สีชมพู/ม่วง) */}
               <button 
                 onClick={() => setActiveMenu('manual')}
-                className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-lg transition-all active:scale-98 cursor-pointer text-left"
+                className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-fuchsia-600 hover:bg-fuchsia-700 text-white shadow-md transition-all active:scale-98 cursor-pointer text-left border border-fuchsia-500"
               >
-                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center text-2xl shrink-0">
+                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl shrink-0">
                   📖
                 </div>
                 <div>
-                  <span className="block text-base font-black">คู่มือการใช้งาน</span>
-                  <span className="text-xs text-purple-100 opacity-90">อ่านระเบียบและวิธีจองรถ</span>
+                  <span className="block text-sm font-bold text-white">คู่มือการใช้งาน</span>
+                  <span className="text-[11px] text-fuchsia-100">อ่านระเบียบและวิธีจองรถ</span>
                 </div>
               </button>
             </div>
           </div>
 
-          <div className="relative overflow-hidden bg-gradient-to-br from-blue-900 via-slate-900 to-slate-950 p-8 md:p-10 rounded-2xl text-white shadow-xl border border-slate-800">
-            <div className="relative z-10 max-w-2xl space-y-4">
+          <div className="relative overflow-hidden bg-gradient-to-br from-blue-900 via-slate-900 to-slate-950 p-6 md:p-8 rounded-2xl text-white shadow-xl border border-slate-800">
+            <div className="relative z-10 max-w-2xl space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="bg-white/10 text-slate-200 text-[10px] font-semibold tracking-wider uppercase px-3 py-1 rounded-full backdrop-blur-md border border-white/10">Central Transport Hub</span>
                 <button 
                   onClick={() => setShowSummaryModal(true)}
-                  className="bg-emerald-600/90 hover:bg-emerald-600 text-white text-[11px] font-medium px-3.5 py-1.5 rounded-full transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                  className="bg-emerald-600/90 hover:bg-emerald-600 text-white text-[11px] font-medium px-3 py-1 rounded-full transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
                 >
                   ตรวจสอบรายชื่อผู้เดินทางประจำวัน ({bookingsList.filter(b => b.travelDate === todayStr).length})
                 </button>
               </div>
-              <h2 className="text-xl md:text-2xl font-bold tracking-tight text-white">ระบบจองรถตู้พนักงานบริษัท แอร์โรเฟลกซ์ จำกัด</h2>
+              <h2 className="text-lg md:text-xl font-bold tracking-tight text-white">ระบบจองรถตู้พนักงานบริษัท แอร์โรเฟลกซ์ จำกัด</h2>
               <p className="text-xs text-slate-300 font-normal leading-relaxed">ระบบสารสนเทศสำหรับการตรวจสอบข้อมูลเดินรถ ตารางเวลาสถานีรับส่ง และลงทะเบียนเพื่อสำรองที่นั่งพนักงานส่วนกลางขององค์กร (ตัดรอบจองเวลา 15.00 น.)</p>
             </div>
           </div>
@@ -1423,7 +1426,7 @@ export default function UserView({
             <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-end">
               <button 
                 onClick={() => setShowManualModal(false)}
-                className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white px-8 py-2.5 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-md"
+                className="w-full md:w-auto bg-slate-900 hover:bg-black text-white px-8 py-2.5 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-md"
               >
                 รับทราบ / ปิดหน้าต่างนี้
               </button>
