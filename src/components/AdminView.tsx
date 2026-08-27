@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { collection, doc, updateDoc, addDoc, deleteDoc, arrayUnion, onSnapshot, setDoc } from 'firebase/firestore';
+import { initializeApp } from 'firebase/app';
+import { getAuth, createUserWithEmailAndPassword } from 'firebase/auth';
 
 interface AdminViewProps {
   db: any;
@@ -13,15 +15,13 @@ interface AdminViewProps {
   supportTicketsList?: any[];
   cancellationRequestsList?: any[]; 
   adHocRequestsList?: any[]; 
+  employeesList?: any[]; 
   showAlert: (type: 'success' | 'warning' | 'error' | 'info', title: string, message: string, onConfirm?: () => void, showCancel?: boolean) => void;
 }
 
 type SystemControlMode = 'AUTO' | 'FORCE_OPEN' | 'FORCE_CLOSE';
 type Language = 'TH' | 'EN';
 
-// -------------------------------------------------------------
-// 🌐 Dictionary สำหรับรองรับ 2 ภาษา (TH / EN)
-// -------------------------------------------------------------
 const translations = {
   TH: {
     systemControl: '⏱️ ควบคุมระบบเปิด-ปิดการจองรถตู้',
@@ -40,15 +40,29 @@ const translations = {
     outServiceHours: 'นอกเวลาทำการ (ปิดอัตโนมัติ 16:00 - 08:00 น.)',
     activeMode: 'ใช้งานอยู่',
     
-    // Tabs
     tabOverview: '📊 สรุปภาพรวมการจอง',
     tabRoutes: '🚌 จัดการสายรถตู้',
+    tabEmployees: '👥 จัดการพนักงาน', 
     tabAnnouncements: '📢 จัดการประกาศข่าว',
     tabTickets: '📬 กล่องข้อความแจ้งปัญหา',
     tabCancellation: '❌ คำขอยกเลิกการจอง',
     tabAdHoc: '🕒 คำขอเปลี่ยนกะ/ออกก่อน',
 
-    // Overview
+    employeeManagementTitle: '👥 ระบบจัดการข้อมูลพนักงาน (สร้างบัญชี / รหัสพนักงาน)',
+    addEmployeeTitle: '➕ เพิ่มพนักงานใหม่เข้าสู่ระบบ',
+    editEmployeeTitle: '✏️ แก้ไขข้อมูลพนักงาน',
+    empNameLabel: 'ชื่อ - นามสกุล พนักงาน',
+    empIdLabel: 'รหัสพนักงาน (ใช้สำหรับ Login)',
+    empDeptLabel: 'แผนก / องค์กร',
+    saveEmployeeBtn: 'บันทึกข้อมูลพนักงาน',
+    saveEditEmployeeBtn: 'บันทึกการแก้ไขพนักงาน',
+    cancelEditEmp: 'ยกเลิก',
+    employeeListTitle: '📄 รายชื่อพนักงานทั้งหมดในระบบ',
+    noEmployeesFound: '📭 ไม่พบข้อมูลพนักงานที่ค้นหา',
+    deleteEmployeeBtn: 'ลบพนักงาน',
+    editEmployeeBtn: 'แก้ไข',
+    searchEmpPlaceholder: '🔍 ค้นหาด้วยรหัสพนักงาน หรือ ชื่อ...',
+
     filterDate: '📅 วันที่:',
     filterShift: '⚡ กะ:',
     allShifts: 'ทุกกะ (All Shifts)',
@@ -70,7 +84,6 @@ const translations = {
     pickup: 'จุดรับ:',
     travelDate: 'เดินทาง:',
 
-    // Routes
     editRouteTitle: '✏️ แก้ไขข้อมูลสายรถ',
     addRouteTitle: '➕ สร้างและเพิ่มสายรถคันใหม่',
     cancelEdit: 'ยกเลิกแก้ไข',
@@ -90,7 +103,6 @@ const translations = {
     editRouteBtn: 'แก้ไข',
     noRoutesFound: 'ไม่พบข้อมูลสายรถในหมวดหมู่',
 
-    // Announcements
     createAnnouncementTitle: '📢 สร้างประกาศข่าวสารใหม่ถึงพนักงาน',
     announceTitleLabel: 'หัวข้อประกาศข่าว',
     announceContentLabel: 'เนื้อหาประกาศ',
@@ -98,7 +110,6 @@ const translations = {
     announceHistoryTitle: '📄 ประวัติและรายการประกาศข่าวสารประชาสัมพันธ์',
     deleteBtn: 'ลบ',
 
-    // Support Chat
     supportChatTitle: 'ห้องแชทโต้ตอบจัดการข้อความและปัญหาพนักงาน',
     totalCases: 'ในหน้านี้พบทั้งหมด',
     casesUnit: 'เคส',
@@ -112,13 +123,11 @@ const translations = {
     typeReplyPlaceholder: 'พิมพ์ข้อความตอบกลับ...',
     sendChatBtn: 'ส่งแชท',
 
-    // Cancellation
     cancellationTitle: 'ตรวจสอบและอนุมัติคำขอยกเลิกตั๋วพนักงาน',
     noCancelRequests: '📭 ไม่มีคำขอยกเลิกตั๋วในขณะนี้',
     approveDeleteTicket: '🗑️ อนุมัติลบตั๋วออกจากระบบ',
     reasonSpecified: 'เหตุผลที่ระบุ:',
 
-    // AdHoc Requests
     adhocTitle: '🕒 ตรวจสอบและอนุมัติคำขอเปลี่ยนกะ / ออกก่อนเวลาพนักงาน',
     allRequests: '📋 ทั้งหมด',
     approvedStatus: '✅ อนุมัติแล้ว',
@@ -150,15 +159,29 @@ const translations = {
     outServiceHours: 'Out of Service Hours (Auto Closed 16:00 - 08:00)',
     activeMode: 'Active',
     
-    // Tabs
     tabOverview: '📊 Booking Overview',
     tabRoutes: '🚌 Van Routes',
+    tabEmployees: '👥 Employees', 
     tabAnnouncements: '📢 Announcements',
     tabTickets: '📬 Support Tickets',
     tabCancellation: '❌ Cancellations',
     tabAdHoc: '🕒 Shift & Early Exit',
 
-    // Overview
+    employeeManagementTitle: '👥 Employee Management (Account & ID Creation)',
+    addEmployeeTitle: '➕ Add New Employee',
+    editEmployeeTitle: '✏️ Edit Employee Information',
+    empNameLabel: 'Employee Full Name',
+    empIdLabel: 'Employee ID (Used for Login)',
+    empDeptLabel: 'Department',
+    saveEmployeeBtn: 'Save Employee Data',
+    saveEditEmployeeBtn: 'Save Employee Changes',
+    cancelEditEmp: 'Cancel',
+    employeeListTitle: '📄 Registered Employees List',
+    noEmployeesFound: '📭 No matching employees found',
+    deleteEmployeeBtn: 'Delete Employee',
+    editEmployeeBtn: 'Edit',
+    searchEmpPlaceholder: '🔍 Search by Employee ID or Name...',
+
     filterDate: '📅 Date:',
     filterShift: '⚡ Shift:',
     allShifts: 'All Shifts',
@@ -180,7 +203,6 @@ const translations = {
     pickup: 'Pickup:',
     travelDate: 'Travel Date:',
 
-    // Routes
     editRouteTitle: '✏️ Edit Route Information',
     addRouteTitle: '➕ Add New Van Route',
     cancelEdit: 'Cancel Edit',
@@ -200,7 +222,6 @@ const translations = {
     editRouteBtn: 'Edit',
     noRoutesFound: 'No routes found in category',
 
-    // Announcements
     createAnnouncementTitle: '📢 Post New Announcement to Employees',
     announceTitleLabel: 'Title',
     announceContentLabel: 'Content Details',
@@ -208,7 +229,6 @@ const translations = {
     announceHistoryTitle: '📄 Announcement History',
     deleteBtn: 'Delete',
 
-    // Support Chat
     supportChatTitle: 'Employee Support Ticket & Chat Management',
     totalCases: 'Total found:',
     casesUnit: 'cases',
@@ -222,13 +242,11 @@ const translations = {
     typeReplyPlaceholder: 'Type a reply...',
     sendChatBtn: 'Send',
 
-    // Cancellation
     cancellationTitle: 'Review & Approve Ticket Cancellation Requests',
     noCancelRequests: '📭 No cancellation requests at this time',
     approveDeleteTicket: '🗑️ Approve & Delete Ticket',
     reasonSpecified: 'Reason Provided:',
 
-    // AdHoc Requests
     adhocTitle: '🕒 Review & Approve Shift Change / Early Exit Requests',
     allRequests: '📋 All',
     approvedStatus: '✅ Approved',
@@ -248,7 +266,6 @@ const translations = {
 export default function AdminView({ 
   db, 
   user, 
-  theme, 
   routesList = [], 
   bookingsList = [], 
   announcementsList = [], 
@@ -258,9 +275,6 @@ export default function AdminView({
   showAlert 
 }: AdminViewProps) {
 
-  // -------------------------------------------------------------
-  // Real-time Clock & Language Toggle States
-  // -------------------------------------------------------------
   const [currentTime, setCurrentTime] = useState<string>('');
   const [lang, setLang] = useState<Language>('TH');
   const t = translations[lang];
@@ -279,19 +293,14 @@ export default function AdminView({
     return () => clearInterval(timer);
   }, []);
 
-  // Navigation Tabs
-  const [adminTab, setAdminTab] = useState<'overview' | 'routes' | 'announcements' | 'tickets' | 'cancellation' | 'adhoc'>('overview');
+  const [adminTab, setAdminTab] = useState<'overview' | 'routes' | 'employees' | 'announcements' | 'tickets' | 'cancellation' | 'adhoc'>('overview');
   const [ticketSubTab, setTicketSubTab] = useState<'Pending' | 'Processing' | 'Resolved'>('Pending');
   const [adhocSubTab, setAdhocSubTab] = useState<'All' | 'Pending' | 'Approved' | 'Rejected'>('All');
 
-  // Control System States
   const [controlMode, setControlMode] = useState<SystemControlMode>('AUTO');
-
-  // Reject Reasoning
   const [rejectReasonInputs, setRejectReasonInputs] = useState<{ [id: string]: string }>({});
   const [rejectingId, setRejectingId] = useState<string | null>(null);
 
-  // Filters
   const [adminRouteFilter, setAdminRouteFilter] = useState<'Day' | 'Shift'>('Day');
 
   const getTodayDateString = () => {
@@ -306,7 +315,25 @@ export default function AdminView({
   const [selectedOverviewDate, setSelectedOverviewDate] = useState<string>(todayStr);
   const [selectedShiftTypeFilter, setSelectedShiftTypeFilter] = useState<string>('ALL');
 
-  // Route Form States
+  const [newEmpName, setNewEmpName] = useState('');
+  const [newEmpId, setNewEmpId] = useState('');
+  const [newEmpDept, setNewEmpDept] = useState('');
+  
+  // ✏️ State สำหรับโหมดแก้ไขข้อมูลพนักงาน
+  const [editingEmpId, setEditingEmpId] = useState<string | null>(null);
+
+  const [localEmployeesList, setLocalEmployeesList] = useState<any[]>([]);
+  const [employeeSearchQuery, setEmployeeSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (!db) return;
+    const unsubscribe = onSnapshot(collection(db, 'employees'), (snapshot) => {
+      const emps = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setLocalEmployeesList(emps);
+    });
+    return () => unsubscribe();
+  }, [db]);
+
   const [editingRouteId, setEditingRouteId] = useState<string | null>(null);
   const [newRouteName, setNewRouteName] = useState('');
   const [newRoutePlate, setNewRoutePlate] = useState('');
@@ -318,17 +345,12 @@ export default function AdminView({
   const [timeInput, setTimeInput] = useState('');
   const [stopsList, setStopsList] = useState<{ station: string; time: string }[]>([]);
 
-  // Announcement Form States
   const [newAnnounceTitle, setNewAnnounceTitle] = useState('');
   const [newAnnounceContent, setNewAnnounceContent] = useState('');
 
-  // Support Chat States
   const [replyMessages, setReplyMessages] = useState<{ [ticketId: string]: string }>({}); 
   const [, setUpdatingTicketId] = useState<string | null>(null);
 
-  // -------------------------------------------------------------
-  // ระบบตั้งเวลา และ Manual Override (เปิด/ปิด จองรถ)
-  // -------------------------------------------------------------
   useEffect(() => {
     if (!db) return;
     const sysControlRef = doc(db, 'system_settings', 'booking_control');
@@ -392,7 +414,85 @@ export default function AdminView({
     }
   };
 
-  // Lists Processing
+  // 💾 ฟังก์ชันบันทึก / แก้ไขข้อมูลพนักงาน
+  const handleSaveEmployee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newEmpName || !newEmpId) return;
+
+    const empIdTrim = newEmpId.trim();
+
+    try {
+      if (editingEmpId) {
+        // อัปเดตข้อมูลพนักงานเดิม
+        await updateDoc(doc(db, 'employees', editingEmpId), {
+          name: newEmpName.trim(),
+          department: newEmpDept.trim() || 'General',
+          updatedAt: new Date().toISOString()
+        });
+        showAlert('success', 'สำเร็จ', `อัปเดตข้อมูลพนักงานรหัส ${editingEmpId} เรียบร้อย!`);
+        setEditingEmpId(null);
+      } else {
+        // เพิ่มพนักงานใหม่ + สร้าง Auth
+        const email = `${empIdTrim}@company.com`;
+        const password = `${empIdTrim}@aero`;
+
+        const firebaseConfig = db.app.options;
+        const secondaryApp = initializeApp(firebaseConfig, `SecondaryApp_${Date.now()}`);
+        const secondaryAuth = getAuth(secondaryApp);
+
+        await createUserWithEmailAndPassword(secondaryAuth, email, password);
+        await secondaryAuth.signOut();
+
+        await setDoc(doc(db, 'employees', empIdTrim), {
+          employeeId: empIdTrim,
+          name: newEmpName.trim(),
+          department: newEmpDept.trim() || 'General',
+          email: email,
+          createdAt: new Date().toISOString()
+        });
+
+        showAlert('success', 'สำเร็จ', `เพิ่มพนักงานรหัส ${empIdTrim} เข้าระบบและสร้างรหัสผ่านเรียบร้อย!`);
+      }
+
+      setNewEmpName('');
+      setNewEmpId('');
+      setNewEmpDept('');
+    } catch (err: any) {
+      console.error(err);
+      if (err.code === 'auth/email-already-in-use') {
+        showAlert('warning', 'ซ้ำ', 'รหัสพนักงานนี้มีในระบบแล้ว!');
+      } else {
+        showAlert('error', 'เกิดข้อผิดพลาด', err.message || 'ไม่สามารถดำเนินการได้');
+      }
+    }
+  };
+
+  // ✏️ คลิกปุ่มแก้ไขพนักงานเพื่อดึงข้อมูลมาใส่ฟอร์ม
+  const handleEditEmployeeClick = (emp: any) => {
+    setEditingEmpId(emp.id || emp.employeeId);
+    setNewEmpId(emp.employeeId || emp.id || '');
+    setNewEmpName(emp.name || '');
+    setNewEmpDept(emp.department || '');
+  };
+
+  const handleCancelEditEmp = () => {
+    setEditingEmpId(null);
+    setNewEmpId('');
+    setNewEmpName('');
+    setNewEmpDept('');
+  };
+
+  const handleDeleteEmployee = async (id: string) => {
+    showAlert('warning', 'ยืนยันการลบ', 'คุณแน่ใจหรือไม่ที่จะลบพนักงานคนนี้ออกจากฐานข้อมูล?', async () => {
+      try {
+        await deleteDoc(doc(db, 'employees', id));
+        showAlert('success', 'Deleted', 'Employee removed successfully');
+      } catch {
+        showAlert('error', 'Error', 'Failed to delete employee');
+      }
+    }, true);
+  };
+
   const combinedCancelRequests = [
     ...cancellationRequestsList,
     ...supportTicketsList.filter(t => {
@@ -451,6 +551,15 @@ export default function AdminView({
     return type === adminRouteFilter;
   });
 
+  const filteredEmployeesList = localEmployeesList.filter(emp => {
+    const query = employeeSearchQuery.trim().toLowerCase();
+    if (!query) return true;
+    const empId = (emp.employeeId || emp.id || '').toLowerCase();
+    const empName = (emp.name || '').toLowerCase();
+    const empDept = (emp.department || '').toLowerCase();
+    return empId.includes(query) || empName.includes(query) || empDept.includes(query);
+  });
+
   const formatThaiDate = (dateStr: string) => {
     if (!dateStr) return '';
     const parts = dateStr.split('-');
@@ -462,7 +571,6 @@ export default function AdminView({
     return `${dd}/${mm}/${yyyy}`;
   };
 
-  // Stop handlers
   const handleAddStop = () => {
     if (!stationInput || !timeInput) return;
     setStopsList(prev => [...prev, { station: stationInput, time: timeInput }]);
@@ -667,7 +775,6 @@ export default function AdminView({
   return (
     <div className="text-sm text-slate-800 dark:text-slate-100 max-w-6xl mx-auto space-y-6">
       
-      {/* 🟢 PANEL ควบคุมการเปิด-ปิดระบบจอง + ปุ่มนาฬิกา Real-time & สลับภาษา TH/EN */}
       <div className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-4 print:hidden">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-800 pb-3">
           <div>
@@ -679,14 +786,11 @@ export default function AdminView({
             </p>
           </div>
 
-          {/* 🌟 Widgets: นาฬิกา Real-Time + ปุ่มสลับภาษา TH / EN */}
           <div className="flex items-center gap-2.5">
-            {/* Real-time Clock */}
             <div className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 font-mono text-xs font-bold border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-center min-w-[85px]">
               {currentTime || '00:00:00'}
             </div>
 
-            {/* Language Switcher Button */}
             <button
               type="button"
               onClick={() => setLang(prev => prev === 'TH' ? 'EN' : 'TH')}
@@ -780,17 +884,16 @@ export default function AdminView({
         </div>
       </div>
 
-      {/* Navigation Tabs */}
       <div className="flex border-b border-slate-200 dark:border-slate-800 gap-2 overflow-x-auto pb-px print:hidden">
         <button onClick={() => setAdminTab('overview')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap cursor-pointer ${adminTab === 'overview' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>{t.tabOverview}</button>
         <button onClick={() => setAdminTab('routes')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap cursor-pointer ${adminTab === 'routes' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>{t.tabRoutes} ({routesList.length})</button>
+        <button onClick={() => setAdminTab('employees')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap cursor-pointer ${adminTab === 'employees' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>{t.tabEmployees} ({localEmployeesList.length})</button>
         <button onClick={() => setAdminTab('announcements')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap cursor-pointer ${adminTab === 'announcements' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>{t.tabAnnouncements} ({announcementsList.length})</button>
         <button onClick={() => setAdminTab('tickets')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${adminTab === 'tickets' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>{t.tabTickets} {pendingTicketsCount > 0 && (<span className="bg-red-500 text-white text-[10px] h-4 px-1.5 rounded-full flex items-center justify-center font-bold animate-pulse">{pendingTicketsCount}</span>)}</button>
         <button onClick={() => setAdminTab('cancellation')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${adminTab === 'cancellation' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>{t.tabCancellation} {cancelRequestsCount > 0 && (<span className="bg-amber-500 text-white text-[10px] h-4 px-1.5 rounded-full flex items-center justify-center font-bold">{cancelRequestsCount}</span>)}</button>
         <button onClick={() => setAdminTab('adhoc')} className={`px-4 py-2.5 font-bold text-xs uppercase tracking-wider transition-all border-b-2 whitespace-nowrap flex items-center gap-1.5 cursor-pointer ${adminTab === 'adhoc' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-white'}`}>{t.tabAdHoc} {pendingAdHocCount > 0 && (<span className="bg-blue-600 text-white text-[10px] h-4 px-1.5 rounded-full flex items-center justify-center font-bold">{pendingAdHocCount}</span>)}</button>
       </div>
 
-      {/* 1. OVERVIEW TAB */}
       {adminTab === 'overview' && (
         <div className="space-y-6">
           <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white dark:bg-slate-900 p-4 border rounded-2xl shadow-sm border-slate-200 dark:border-slate-800 print:hidden">
@@ -944,7 +1047,6 @@ export default function AdminView({
         </div>
       )}
 
-      {/* 2. ROUTES TAB */}
       {adminTab === 'routes' && (
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
           <div className="md:col-span-5 p-5 bg-white dark:bg-slate-900 border rounded-2xl shadow-sm border-slate-200 dark:border-slate-800 h-fit space-y-4">
@@ -1073,7 +1175,112 @@ export default function AdminView({
         </div>
       )}
 
-      {/* 3. ANNOUNCEMENTS TAB */}
+      {/* 3. EMPLOYEES TAB (รองรับทั้งเพิ่ม, ค้นหา, และแก้ไขข้อมูลพนักงาน) */}
+      {adminTab === 'employees' && (
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+          <div className="md:col-span-5 p-5 bg-white dark:bg-slate-900 border rounded-2xl shadow-sm border-slate-200 dark:border-slate-800 h-fit space-y-4">
+            <div className="flex justify-between items-center">
+              <h3 className="text-xs font-black text-slate-500 uppercase tracking-wider">
+                {editingEmpId ? t.editEmployeeTitle : t.addEmployeeTitle}
+              </h3>
+              {editingEmpId && (
+                <button type="button" onClick={handleCancelEditEmp} className="text-xs text-slate-400 hover:text-slate-600 font-bold cursor-pointer">{t.cancelEditEmp}</button>
+              )}
+            </div>
+            <form onSubmit={handleSaveEmployee} className="space-y-3 text-xs">
+              <div>
+                <label className="block text-slate-400 font-bold mb-1">{t.empIdLabel}</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. 12345..." 
+                  value={newEmpId} 
+                  onChange={e => setNewEmpId(e.target.value)} 
+                  disabled={!!editingEmpId}
+                  className={`w-full border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl dark:bg-slate-950 focus:outline-none focus:border-blue-500 font-mono ${editingEmpId ? 'opacity-60 cursor-not-allowed' : ''}`} 
+                  required 
+                />
+              </div>
+              <div>
+                <label className="block text-slate-400 font-bold mb-1">{t.empNameLabel}</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. John Doe..." 
+                  value={newEmpName} 
+                  onChange={e => setNewEmpName(e.target.value)} 
+                  className="w-full border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl dark:bg-slate-950 focus:outline-none focus:border-blue-500" 
+                  required 
+                />
+              </div>
+              <div>
+                <label className="block text-slate-400 font-bold mb-1">{t.empDeptLabel}</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Engineering / Production..." 
+                  value={newEmpDept} 
+                  onChange={e => setNewEmpDept(e.target.value)} 
+                  className="w-full border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl dark:bg-slate-950 focus:outline-none focus:border-blue-500" 
+                />
+              </div>
+              <button type="submit" className={`w-full font-bold py-2.5 rounded-xl transition-all shadow cursor-pointer ${editingEmpId ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}>
+                {editingEmpId ? t.saveEditEmployeeBtn : t.saveEmployeeBtn}
+              </button>
+            </form>
+          </div>
+
+          <div className="md:col-span-7 space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <h3 className="text-xs font-black text-slate-500 uppercase tracking-wider">{t.employeeListTitle} ({filteredEmployeesList.length})</h3>
+              
+              <div className="w-full sm:w-64">
+                <input 
+                  type="text"
+                  placeholder={t.searchEmpPlaceholder}
+                  value={employeeSearchQuery}
+                  onChange={(e) => setEmployeeSearchQuery(e.target.value)}
+                  className="w-full border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-2 rounded-xl text-xs focus:outline-none focus:border-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2.5">
+              {filteredEmployeesList.length > 0 ? (
+                filteredEmployeesList.map(emp => (
+                  <div key={emp.id} className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl flex justify-between items-center shadow-sm">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/50 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-900 text-xs">
+                          {emp.employeeId}
+                        </span>
+                        <h4 className="font-bold text-slate-900 dark:text-white text-sm">{emp.name}</h4>
+                      </div>
+                      <p className="text-xs text-slate-400 mt-1">Department: <strong className="text-slate-600 dark:text-slate-300">{emp.department || 'General'}</strong></p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <button 
+                        onClick={() => handleEditEmployeeClick(emp)} 
+                        className="text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/30 text-xs px-3 py-1.5 rounded-lg font-bold cursor-pointer"
+                      >
+                        {t.editEmployeeBtn}
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteEmployee(emp.id)} 
+                        className="text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 text-xs px-3 py-1.5 rounded-lg font-bold cursor-pointer"
+                      >
+                        {t.deleteEmployeeBtn}
+                      </button>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-16 bg-white dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-slate-400">
+                  {t.noEmployeesFound}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {adminTab === 'announcements' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-1 p-5 bg-white dark:bg-slate-900 border rounded-2xl shadow-sm border-slate-200 dark:border-slate-800 h-fit space-y-4">
@@ -1100,7 +1307,6 @@ export default function AdminView({
         </div>
       )}
 
-      {/* 4. TICKETS TAB */}
       {adminTab === 'tickets' && (
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
@@ -1159,7 +1365,6 @@ export default function AdminView({
         </div>
       )}
 
-      {/* 5. CANCELLATION TAB */}
       {adminTab === 'cancellation' && (
         <div className="space-y-4">
           <div className="flex justify-between items-center">
@@ -1192,7 +1397,6 @@ export default function AdminView({
         </div>
       )}
 
-      {/* 6. AD-HOC REQUESTS TAB */}
       {adminTab === 'adhoc' && (
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">

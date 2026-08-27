@@ -2,13 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
-import { Mail, Lock, Bus, AlertCircle } from 'lucide-react';
+// 🟢 นำเข้า doc เพิ่มเติมเพื่อใช้ดึงข้อมูลพนักงานรายบุคคล
+import { collection, query, orderBy, onSnapshot, doc } from 'firebase/firestore';
+import { User, Lock, Bus, AlertCircle } from 'lucide-react'; 
 
-// นำเข้า auth และ db จากไฟล์กลาง src/lib/firebase.ts ของโปรเจกต์
 import { auth, db } from '../lib/firebase';
-
-// นำเข้าหน้าย่อยที่แยกไว้
 import UserView from '../components/UserView';
 import AdminView from '../components/AdminView';
 
@@ -20,6 +18,9 @@ export default function EnterpriseVanBookingSystem() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const isAdmin = user?.email === 'admin@company.com';
+
+  // 🟢 State สำหรับเก็บข้อมูลพนักงานที่จะโชว์มุมขวาบน
+  const [employeeData, setEmployeeData] = useState<any>(null);
 
   useEffect(() => {
     if (user && !isAdmin && activeMenu === 'admin') {
@@ -42,7 +43,7 @@ export default function EnterpriseVanBookingSystem() {
   const [adHocRequestsList, setAdHocRequestsList] = useState<any[]>([]);
   const [recentBooking, setRecentBooking] = useState<any>(null);
 
-  const [email, setEmail] = useState('');
+  const [employeeId, setEmployeeId] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -87,14 +88,26 @@ export default function EnterpriseVanBookingSystem() {
       setAdHocRequestsList(list);
     });
 
+    // 🟢 ดึงข้อมูลพนักงานจาก Firestore อัตโนมัติ (เพื่อเอาชื่อมาโชว์มุมขวาบน)
+    let unsubscribeEmp: any = null;
+    if (!isAdmin && user.email) {
+      const empId = user.email.split('@')[0];
+      unsubscribeEmp = onSnapshot(doc(db, 'employees', empId), (docSnap) => {
+        if (docSnap.exists()) {
+          setEmployeeData(docSnap.data());
+        }
+      });
+    }
+
     return () => {
       unsubscribeRoutes();
       unsubscribeBookings();
       unsubscribeAnnounce();
       unsubscribeTickets();
       unsubscribeShiftRequests();
+      if (unsubscribeEmp) unsubscribeEmp();
     };
-  }, [user]);
+  }, [user, isAdmin]);
 
   const theme = {
     bg: isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-[#f8fafc] text-slate-800',
@@ -106,13 +119,39 @@ export default function EnterpriseVanBookingSystem() {
 
   if (loading) return <div className="flex min-h-screen items-center justify-center bg-slate-950 text-white text-xs">Loading...</div>;
 
-  // 🎨 ส่วนหน้าจอ Login ใหม่ (ปรับเพิ่ม Mobile First Responsive)
   if (!user) {
+    const isLoginAdmin = employeeId.trim().toLowerCase() === 'admin';
+
+    const handleLogin = async (e: React.FormEvent) => {
+      e.preventDefault(); 
+      setLoginError(''); 
+      setIsLoggingIn(true);
+      
+      try {
+        let loginEmail = '';
+        let loginPassword = '';
+
+        if (isLoginAdmin) {
+          loginEmail = 'admin@company.com';
+          loginPassword = password; 
+        } else {
+          const empIdStr = employeeId.trim();
+          loginEmail = `${empIdStr}@company.com`;
+          loginPassword = `${empIdStr}@aero`; 
+        }
+
+        await signInWithEmailAndPassword(auth, loginEmail, loginPassword); 
+      } catch (error) { 
+        setLoginError('รหัสพนักงานไม่ถูกต้อง หรือยังไม่ได้ลงทะเบียนในระบบ'); 
+      } finally { 
+        setIsLoggingIn(false); 
+      }
+    };
+
     return (
       <div className="flex min-h-screen w-full items-center justify-center bg-slate-100 p-4 sm:p-6 md:p-8">
         <div className="flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl sm:rounded-3xl bg-white shadow-xl sm:shadow-2xl border border-slate-200/80 md:flex-row">
           
-          {/* 🔷 ฝั่งซ้าย: แสดงในคอมพิวเตอร์ (Desktop View) */}
           <div className="hidden w-1/2 flex-col justify-between bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 p-10 text-white md:flex">
             <div className="flex items-center gap-2.5 font-bold tracking-wider text-blue-400">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/20 text-blue-400 border border-blue-400/30">
@@ -138,7 +177,6 @@ export default function EnterpriseVanBookingSystem() {
             </div>
           </div>
 
-          {/* 📱 แถบ Header โลโก้เพิ่มเติมสำหรับมือถือ (Mobile Header Bar) */}
           <div className="flex items-center justify-between bg-gradient-to-r from-slate-900 to-blue-950 px-6 py-5 text-white md:hidden">
             <div className="flex items-center gap-2.5 font-bold tracking-wider">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/20 text-blue-400 border border-blue-400/30">
@@ -151,30 +189,15 @@ export default function EnterpriseVanBookingSystem() {
             </span>
           </div>
 
-          {/* ⬜ ฝั่งขวา: ฟอร์ม Login (รองรับจอทุกขนาด) */}
           <div className="flex w-full flex-col justify-center p-6 sm:p-8 md:w-1/2 md:p-12">
             <div className="mb-6 space-y-1 text-center md:text-left">
               <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900">เข้าสู่ระบบ</h2>
               <p className="text-xs text-slate-500">
-                ระบบจองรถตู้พนักงาน บริษัท แอร์โรเฟลกซ์ จำกัด
+                กรุณากรอกรหัสพนักงานของคุณเพื่อเข้าสู่ระบบ
               </p>
             </div>
 
-            <form 
-              onSubmit={async (e) => {
-                e.preventDefault(); 
-                setLoginError(''); 
-                setIsLoggingIn(true);
-                try { 
-                  await signInWithEmailAndPassword(auth, email, password); 
-                } catch { 
-                  setLoginError('อีเมลหรือรหัสผ่านไม่ถูกต้อง'); 
-                } finally { 
-                  setIsLoggingIn(false); 
-                }
-              }} 
-              className="space-y-4"
-            >
+            <form onSubmit={handleLogin} className="space-y-4">
               {loginError && (
                 <div className="flex items-center gap-2 rounded-xl bg-red-50 p-3 text-xs font-medium text-red-600 border border-red-100">
                   <AlertCircle className="h-4 w-4 shrink-0" />
@@ -183,34 +206,36 @@ export default function EnterpriseVanBookingSystem() {
               )}
 
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700">อีเมล</label>
+                <label className="text-xs font-semibold text-slate-700">รหัสพนักงาน</label>
                 <div className="relative">
-                  <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                   <input 
-                    type="email" 
-                    placeholder="name@company.com" 
-                    value={email} 
-                    onChange={(e) => setEmail(e.target.value)} 
+                    type="text" 
+                    placeholder="เช่น 12345" 
+                    value={employeeId} 
+                    onChange={(e) => setEmployeeId(e.target.value)} 
                     className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-3 md:py-2.5 pl-10 pr-3 text-xs text-slate-900 outline-none transition focus:border-slate-900 focus:bg-white focus:ring-1 focus:ring-slate-900" 
                     required 
                   />
                 </div>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700">รหัสผ่าน</label>
-                <div className="relative">
-                  <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input 
-                    type="password" 
-                    placeholder="••••••••" 
-                    value={password} 
-                    onChange={(e) => setPassword(e.target.value)} 
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-3 md:py-2.5 pl-10 pr-3 text-xs text-slate-900 outline-none transition focus:border-slate-900 focus:bg-white focus:ring-1 focus:ring-slate-900" 
-                    required 
-                  />
+              {isLoginAdmin && (
+                <div className="space-y-1 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <label className="text-xs font-semibold text-slate-700">รหัสผ่านแอดมิน</label>
+                  <div className="relative">
+                    <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <input 
+                      type="password" 
+                      placeholder="••••••••" 
+                      value={password} 
+                      onChange={(e) => setPassword(e.target.value)} 
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-3 md:py-2.5 pl-10 pr-3 text-xs text-slate-900 outline-none transition focus:border-slate-900 focus:bg-white focus:ring-1 focus:ring-slate-900" 
+                      required={isLoginAdmin} 
+                    />
+                  </div>
                 </div>
-              </div>
+              )}
 
               <button 
                 type="submit" 
@@ -222,7 +247,7 @@ export default function EnterpriseVanBookingSystem() {
             </form>
 
             <div className="mt-8 text-center text-[11px] text-slate-400">
-              พบปัญหาการใช้งาน ติดต่อ <span className="font-semibold text-slate-600 underline cursor-pointer">Admin</span>
+              หากไม่สามารถเข้าสู่ระบบได้ กรุณาติดต่อ <span className="font-semibold text-slate-600">แผนก HR / Admin</span>
             </div>
           </div>
 
@@ -233,7 +258,6 @@ export default function EnterpriseVanBookingSystem() {
 
   return (
     <div className={`min-h-screen flex ${theme.bg} antialiased relative`}>
-      {/* GLOBAL MODAL DIALOG */}
       {modalAlert.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-sm text-xs">
           <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-2xl p-6 shadow-2xl text-center space-y-4 border">
@@ -247,7 +271,6 @@ export default function EnterpriseVanBookingSystem() {
         </div>
       )}
 
-      {/* MOBILE BACKDROP */}
       {isMobileMenuOpen && (
         <div 
           className="fixed inset-0 z-40 bg-slate-950/50 md:hidden backdrop-blur-xs"
@@ -255,7 +278,6 @@ export default function EnterpriseVanBookingSystem() {
         />
       )}
 
-      {/* SIDEBAR NAVIGATION */}
       <aside className={`w-64 ${theme.sidebar} border-r flex flex-col justify-between print:hidden fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 md:translate-x-0 md:static ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div>
           <div className="p-6 border-b flex justify-between items-center">
@@ -269,7 +291,7 @@ export default function EnterpriseVanBookingSystem() {
             <button onClick={() => { setActiveMenu('shiftRequest'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-6 py-3 ${activeMenu === 'shiftRequest' ? theme.menuActive : theme.menuInactive}`}>แจ้งขอเปลี่ยนกะ / ออกก่อนเวลา</button>
             
             <button onClick={() => { setActiveMenu('history'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-6 py-3 ${activeMenu === 'history' ? theme.menuActive : theme.menuInactive}`}>ประวัติการเดินทาง</button>
-            <button onClick={() => { setActiveMenu('qrcode'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-6 py-3 ${activeMenu === 'qrcode' ? theme.menuActive : theme.menuInactive}`}>คิวอาร์โค้ดเช็กอิน</button>
+            <button onClick={() => { setActiveMenu('qrcode'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-6 py-3 ${activeMenu === 'qrcode' ? theme.menuActive : theme.menuInactive}`}>คู่มือการใช้งาน</button>
             
             {isAdmin && (
               <div className="pt-4 mt-4 border-t mx-4">
@@ -285,7 +307,6 @@ export default function EnterpriseVanBookingSystem() {
         </div>
       </aside>
 
-      {/* RENDER DYNAMIC VIEWS */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className={`h-16 px-4 md:px-8 border-b ${theme.card} flex justify-between items-center print:hidden`}>
           <div className="flex items-center gap-3 min-w-0">
@@ -294,7 +315,21 @@ export default function EnterpriseVanBookingSystem() {
             </button>
             <div className="text-[11px] md:text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white truncate">ระบบจองรถตู้พนักงานบริษัท แอร์โรเฟลกซ์ จำกัด</div>
           </div>
-          <div className="text-[10px] md:text-xs font-bold truncate ml-2 shrink-0">{user.email}</div>
+          
+          {/* 🟢 อัปเดตส่วนแสดงชื่อและแผนกที่มุมขวาบน */}
+          <div className="flex items-center gap-3 ml-2 shrink-0">
+            <div className="hidden sm:block text-right">
+              <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">
+                {isAdmin ? 'System Administrator' : (employeeData?.name || 'พนักงานทั่วไป')}
+              </p>
+              {!isAdmin && employeeData?.department && (
+                <p className="text-[9px] font-medium text-slate-500">แผนก: {employeeData.department}</p>
+              )}
+            </div>
+            <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-[10px] border border-blue-200 dark:border-blue-800">
+              {isAdmin ? 'ADM' : (user.email?.split('@')[0] || '')}
+            </div>
+          </div>
         </header>
 
         <main className="flex-1 p-4 md:p-8 overflow-y-auto">

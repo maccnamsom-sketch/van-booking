@@ -7,7 +7,7 @@ interface UserViewProps {
   db: any;
   user: any;
   theme: any;
-  activeMenu: 'home' | 'booking' | 'history' | 'qrcode' | 'admin' | 'shiftRequest';
+  activeMenu: 'home' | 'booking' | 'history' | 'qrcode' | 'manual' | 'admin' | 'shiftRequest';
   setActiveMenu: (menu: any) => void;
   routesList: any[];
   bookingsList: any[];
@@ -53,6 +53,9 @@ export default function UserView({
   const [ticketFirstMessage, setTicketFirstMessage] = useState('');
   const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
+
+  // 🟢 State สำหรับควบคุมการแสดง Modal คู่มือเมื่อ Login เข้ามาครั้งแรก
+  const [showManualModal, setShowManualModal] = useState(true);
   
   const [historyFilterDate, setHistoryFilterDate] = useState('');
   const [historyFilterRoute, setHistoryFilterRoute] = useState('');
@@ -80,6 +83,9 @@ export default function UserView({
 
   // State สำหรับดึง Config แบบ Realtime
   const [liveConfig, setLiveConfig] = useState<any>(systemConfig);
+  
+  // 🟢 เพิ่ม State สำหรับเก็บข้อมูลพนักงาน (ชื่อ, แผนก, รหัส)
+  const [employeeData, setEmployeeData] = useState<any>(null);
 
   // 🔴 ดึงค่า Config แบบ Realtime จากทั้ง system_settings และ system_config
   useEffect(() => {
@@ -103,14 +109,28 @@ export default function UserView({
     };
   }, [db]);
 
-  // State ข้อมูลผู้ใช้
+  // 🟢 ฟังก์ชันดึงข้อมูลพนักงานจาก Firestore อัตโนมัติ (ดึงจาก Collection: employees)
+  useEffect(() => {
+    if (!db || !user?.email) return;
+    
+    const empId = user.email.split('@')[0];
+    
+    const unsubEmp = onSnapshot(doc(db, 'employees', empId), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setEmployeeData(data);
+        if (data.name) setEmployeeName(data.name); 
+      }
+    });
+
+    return () => unsubEmp();
+  }, [db, user]);
+
   const [employeeName, setEmployeeName] = useState(user?.displayName || user?.name || '');
   const [employeePhone, setEmployeePhone] = useState(user?.phoneNumber || user?.phone || '');
 
-  // ฟังก์ชันเช็กสถานะการเปิด-ปิดระบบ
   const checkIsBookingOpen = () => {
     const config = liveConfig || systemConfig || {};
-    
     const rawMode = (config.mode || config.status || config.systemStatus || 'AUTO').toString().toUpperCase();
 
     if (rawMode === 'FORCE_CLOSE' || rawMode === 'CLOSED' || rawMode === 'CLOSE') {
@@ -140,7 +160,7 @@ export default function UserView({
   const closeReasonMessage = liveConfig?.closeReason || 'ระบบปิดรับการจองชั่วคราวโดยผู้ดูแลระบบ';
 
   useEffect(() => {
-    if (user) {
+    if (user && !employeeData?.name) {
       if (!employeeName && (user.displayName || user.name)) {
         setEmployeeName(user.displayName || user.name);
       }
@@ -150,10 +170,10 @@ export default function UserView({
     }
     const myLastBooking = bookingsList.find(b => b.employeeEmail === (user?.email || 'employee@company.com'));
     if (myLastBooking) {
-      if (!employeeName && myLastBooking.employeeName) setEmployeeName(myLastBooking.employeeName);
+      if (!employeeName && myLastBooking.employeeName && !employeeData?.name) setEmployeeName(myLastBooking.employeeName);
       if (!employeePhone && myLastBooking.employeePhone) setEmployeePhone(myLastBooking.employeePhone);
     }
-  }, [user, bookingsList]);
+  }, [user, bookingsList, employeeData]);
 
   const myTickets = supportTicketsList.filter(t => t.employeeEmail === (user?.email || 'employee@company.com'));
   const myBookings = bookingsList.filter(b => b.employeeEmail === (user?.email || 'employee@company.com'));
@@ -356,7 +376,6 @@ export default function UserView({
       {/* 🟢 TOP BAR: REALTIME CLOCK & STATUS */}
       <div className="max-w-4xl mx-auto mb-5 px-4 py-2.5 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-xs flex items-center justify-between gap-3 transition-all">
         
-        {/* Live Status Indicator & Clock */}
         <div className="flex items-center gap-2.5 flex-wrap">
           <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide border transition-all ${
             isSystemOpen 
@@ -372,7 +391,6 @@ export default function UserView({
 
           <div className="h-3.5 w-[1px] bg-slate-200 dark:bg-slate-800 hidden sm:block"></div>
 
-          {/* Date & Time display */}
           <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 font-medium">
             <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -386,13 +404,24 @@ export default function UserView({
           </div>
         </div>
 
+        {employeeData && (
+          <div className="flex items-center gap-3 border-l border-slate-200 dark:border-slate-700 pl-3">
+            <div className="hidden sm:block text-right">
+              <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">{employeeData.name}</p>
+              <p className="text-[9px] font-medium text-slate-500">แผนก: {employeeData.department}</p>
+            </div>
+            <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-[10px] border border-blue-200 dark:border-blue-800">
+              {employeeData.employeeId}
+            </div>
+          </div>
+        )}
+
       </div>
 
       {/* 1. HOME TAB */}
       {activeMenu === 'home' && (
         <div className="max-w-4xl mx-auto space-y-8">
           
-          {/* แถบเตือนสถานะเมื่อปิดระบบในหน้าหลัก */}
           {!isSystemOpen && (
             <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-2xl text-rose-700 dark:text-rose-300 flex items-center gap-3 shadow-sm animate-pulse">
               <span className="text-2xl">🔒</span>
@@ -402,6 +431,69 @@ export default function UserView({
               </div>
             </div>
           )}
+
+          {/* 🌟 เมนูลัดขนาดใหญ่พิเศษ สำหรับผู้สูงอายุ / มือถือ (ปุ่มใหญ่ มองง่าย ชัดเจน) */}
+          <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-md space-y-3">
+            <h3 className="text-xs font-black text-slate-400 uppercase tracking-wider text-center">เมนูลัดใช้งานด่วน (กดเลือกเมนูที่ต้องการได้ทันที)</h3>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* ปุ่มจองรถ */}
+              <button 
+                onClick={() => setActiveMenu('booking')}
+                className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg transition-all active:scale-98 cursor-pointer text-left"
+              >
+                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center text-2xl shrink-0">
+                  🚐
+                </div>
+                <div>
+                  <span className="block text-base font-black">ลงทะเบียนจองรถตู้</span>
+                  <span className="text-xs text-blue-100 opacity-90">กดเพื่อสำรองที่นั่งเดินทาง</span>
+                </div>
+              </button>
+
+              {/* ปุ่มประวัติ */}
+              <button 
+                onClick={() => setActiveMenu('history')}
+                className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg transition-all active:scale-98 cursor-pointer text-left"
+              >
+                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center text-2xl shrink-0">
+                  📋
+                </div>
+                <div>
+                  <span className="block text-base font-black">ประวัติการเดินทาง</span>
+                  <span className="text-xs text-emerald-100 opacity-90">ตรวจสอบตั๋วและประวัติจอง</span>
+                </div>
+              </button>
+
+              {/* ปุ่มแจ้งเปลี่ยนกะ */}
+              <button 
+                onClick={() => setActiveMenu('shiftRequest')}
+                className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700 text-white shadow-lg transition-all active:scale-98 cursor-pointer text-left"
+              >
+                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center text-2xl shrink-0">
+                  🕒
+                </div>
+                <div>
+                  <span className="block text-base font-black">ขอเปลี่ยนกะ / ออกก่อน</span>
+                  <span className="text-xs text-amber-100 opacity-90">แจ้งเปลี่ยนเวลากะกระทันหัน</span>
+                </div>
+              </button>
+
+              {/* ปุ่มคู่มือ */}
+              <button 
+                onClick={() => setActiveMenu('manual')}
+                className="flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-lg transition-all active:scale-98 cursor-pointer text-left"
+              >
+                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center text-2xl shrink-0">
+                  📖
+                </div>
+                <div>
+                  <span className="block text-base font-black">คู่มือการใช้งาน</span>
+                  <span className="text-xs text-purple-100 opacity-90">อ่านระเบียบและวิธีจองรถ</span>
+                </div>
+              </button>
+            </div>
+          </div>
 
           <div className="relative overflow-hidden bg-gradient-to-br from-blue-900 via-slate-900 to-slate-950 p-8 md:p-10 rounded-2xl text-white shadow-xl border border-slate-800">
             <div className="relative z-10 max-w-2xl space-y-4">
@@ -779,6 +871,7 @@ export default function UserView({
                 <div className="space-y-4">
                   <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
                     <span className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">ข้อมูลติดต่อสำหรับคนขับ</span>
+                    
                     <div>
                       <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">ชื่อ - นามสกุล พนักงาน</label>
                       <input 
@@ -786,11 +879,29 @@ export default function UserView({
                         placeholder="ชื่อ - นามสกุล" 
                         value={employeeName} 
                         onChange={(e) => setEmployeeName(e.target.value)} 
-                        className="w-full border border-slate-200 dark:border-slate-800 dark:bg-slate-900 p-2.5 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 text-xs" 
+                        readOnly={!!employeeData?.name} 
+                        className={`w-full border p-2.5 rounded-xl text-xs focus:outline-none focus:border-blue-500 transition-colors ${
+                          employeeData?.name 
+                            ? 'bg-slate-200/60 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 cursor-not-allowed' 
+                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white'
+                        }`} 
                       />
                     </div>
+
+                    {employeeData?.department && (
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">แผนก / องค์กร</label>
+                        <input 
+                          type="text" 
+                          value={employeeData.department} 
+                          readOnly 
+                          className="w-full border border-slate-300 dark:border-slate-700 bg-slate-200/60 dark:bg-slate-800 p-2.5 rounded-xl text-slate-600 dark:text-slate-300 text-xs cursor-not-allowed" 
+                        />
+                      </div>
+                    )}
+
                     <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">เบอร์โทรศัพท์</label>
+                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">เบอร์โทรศัพท์ (สำหรับให้คนขับติดต่อ)</label>
                       <input 
                         type="tel" 
                         placeholder="เช่น 0812345678" 
@@ -905,7 +1016,7 @@ export default function UserView({
                       <p><strong>กะทำงาน:</strong> {shiftType === 'Day' ? 'กะ Day' : 'กะ Shift'} ({shiftTimeSlot})</p>
                       <p><strong>ประเภทการเดินทาง:</strong> {tripType === 'roundTrip' ? 'ไป-กลับ' : tripType === 'inboundOnly' ? 'เฉพาะขามา' : 'เฉพาะขากลับ'}</p>
                       <p><strong>สายรถ:</strong> {selectedRouteName}</p>
-                      <p><strong>ชื่อผู้เดินทาง:</strong> {employeeName}</p>
+                      <p><strong>ชื่อผู้เดินทาง:</strong> {employeeName} {employeeData?.department ? `(${employeeData.department})` : ''}</p>
                       <p><strong>เบอร์โทรศัพท์:</strong> {employeePhone}</p>
                       <p><strong>จุดรับ-ส่ง:</strong> จุดที่ #{activeStations[selectedStationIndex]?.index}: {activeStations[selectedStationIndex]?.name} ({activeStations[selectedStationIndex]?.time})</p>
                     </div>
@@ -1184,15 +1295,6 @@ export default function UserView({
                   </div>
                   
                   <div className="flex items-center gap-2 self-start md:self-auto">
-                    <button 
-                      onClick={() => {
-                        setRecentBooking(b);
-                        setActiveMenu('qrcode');
-                      }}
-                      className="bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 font-semibold px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer"
-                    >
-                      ดู QR Code
-                    </button>
                     <span className="text-[10px] font-medium px-2.5 py-1.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900">
                       ยืนยันแล้ว
                     </span>
@@ -1208,36 +1310,126 @@ export default function UserView({
         </div>
       )}
 
-      {/* 5. QRCODE TAB */}
-      {activeMenu === 'qrcode' && (
-        <div className="max-w-md mx-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-6 shadow-xl text-center space-y-4">
-          <div className="border-b border-slate-200 dark:border-slate-800 pb-3">
-            <span className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Check-in Pass</span>
-            <h3 className="font-bold text-sm mt-0.5">คิวอาร์โค้ดสำหรับเช็คอินขึ้นรถ</h3>
+      {/* 5. MANUAL TAB */}
+      {(activeMenu === 'qrcode' || activeMenu === 'manual') && (
+        <div className="max-w-4xl mx-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xl overflow-hidden text-sm text-slate-800 dark:text-slate-100">
+          <div className="bg-slate-950 text-white p-6 text-center border-b border-slate-800">
+            <span className="text-[10px] font-semibold tracking-widest text-slate-400 uppercase">User Manual & Guidelines</span>
+            <h3 className="text-base font-bold tracking-wide mt-1">คู่มือการใช้งานและระเบียบปฏิบัติ</h3>
           </div>
-          {recentBooking ? (
-            <div className="space-y-3">
-              <p className="text-xs text-slate-600 dark:text-slate-300">แสดงคิวอาร์โค้ดนี้ให้คนขับรถสแกนเมื่อถึงจุดรับ</p>
-              <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl inline-block">
-                <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=180x180&data=${encodeURIComponent(recentBooking.id || 'NO_ID')}`} 
-                  alt="QR Code" 
-                  className="mx-auto rounded-lg"
-                />
+
+          <div className="p-6 md:p-8 space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                  <span className="text-lg">📋</span>
+                  <h4 className="font-bold text-sm">ระเบียบปฏิบัติ และ คำแนะนำ</h4>
+                </div>
+                <ul className="text-xs text-slate-600 dark:text-slate-300 space-y-2.5 list-disc pl-5">
+                  <li>กรุณาทำรายการจองล่วงหน้า <strong>ระบบจะตัดรอบจองเวลา 15:00 น. ของทุกวัน</strong></li>
+                  <li>ผู้เดินทางต้องมารอที่จุดรับส่งก่อนเวลาอย่างน้อย <strong>5-10 นาที</strong> หากรถออกไปแล้วจะไม่สามารถวนกลับมารับได้</li>
+                  <li>ตรวจสอบประวัติการจองทุกครั้งที่ทำรายการเสร็จ เพื่อความถูกต้องของสายรถและจุดรับส่ง</li>
+                  <li>หากไม่สามารถเดินทางได้ หรือต้องการเปลี่ยนกะ กรุณาแจ้งยกเลิกล่วงหน้าเพื่อเปิดที่นั่งให้พนักงานท่านอื่น</li>
+                </ul>
               </div>
-              <div className="text-xs text-slate-500 space-y-1">
-                <p><strong>ชื่อผู้เดินทาง:</strong> {recentBooking.employeeName}</p>
-                <p><strong>สายรถ:</strong> {recentBooking.route}</p>
-                <p><strong>กะการทำงาน:</strong> {recentBooking.shiftType} ({recentBooking.shiftTimeSlot})</p>
-                <p><strong>ประเภทการเดินทาง:</strong> {recentBooking.tripType === 'inboundOnly' ? 'เฉพาะขามา' : recentBooking.tripType === 'outboundOnly' ? 'เฉพาะขากลับ' : 'ไป-กลับ'}</p>
-                <p><strong>วันที่เดินทาง:</strong> {formatThaiDate(recentBooking.travelDate)}</p>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                  <span className="text-lg">📱</span>
+                  <h4 className="font-bold text-sm">วิธีการจอง</h4>
+                </div>
+                <ol className="text-xs text-slate-600 dark:text-slate-300 space-y-2.5 list-decimal pl-5">
+                  <li>ไปที่เมนู <strong>ลงทะเบียนจองคิวรถตู้</strong></li>
+                  <li>เลือก <strong>กะการทำงาน</strong> (Day หรือ Shift) และเลือก <strong>สายรถ</strong> ที่ต้องการเดินทาง</li>
+                  <li>เลือกประเภทการเดินทาง (ไป-กลับ, เฉพาะขามา, เฉพาะขากลับ)</li>
+                  <li>กรอกชื่อ-นามสกุล เบอร์โทรศัพท์ และเลือก <strong>สถานี/จุดรับส่ง</strong> พร้อมวันที่เดินทาง</li>
+                  <li>ตรวจสอบข้อมูลในขั้นตอนสุดท้าย และกดปุ่ม <strong>ยืนยันสำรองสิทธิ์</strong></li>
+                </ol>
+              </div>
+
+              <div className="space-y-3 md:col-span-2 bg-rose-50 dark:bg-rose-950/30 p-5 rounded-xl border border-rose-200 dark:border-rose-900/50">
+                <div className="flex items-center gap-2 text-rose-700 dark:text-rose-400">
+                  <span className="text-lg">📞</span>
+                  <h4 className="font-bold text-sm">พบปัญหา หรือ ติดต่อสอบถาม</h4>
+                </div>
+                <p className="text-xs text-rose-700/90 dark:text-rose-400/90 leading-relaxed">
+                  หากพบปัญหาในการเข้าใช้งานระบบ, ต้องการยกเลิกรอบเดินทางกระทันหัน, ลืมของไว้บนรถ, หรือต้องการสอบถามเส้นทางเพิ่มเติม <br className="hidden md:block"/>
+                  สามารถเปิดเคสแจ้งแอดมินได้ผ่านหน้า <strong>"หน้าหลัก & ประกาศ"</strong> ในส่วนของ <strong>"ติดต่อ / แจ้งปัญหาถึงแอดมิน"</strong> <br />
+                  หรือติดต่อฝ่ายธุรการ เบอร์โทรศัพท์: <strong>02-XXX-XXXX</strong>
+                </p>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 🟢 MODAL อัตโนมัติ: คู่มือการใช้งานและระเบียบปฏิบัติ (เด้งขึ้นมาทันทีเมื่อ Login สำเร็จ และไม่มีแผนที่) */}
+      {showManualModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fadeIn">
+          <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-6 text-sm text-slate-800 dark:text-slate-100 flex flex-col max-h-[90vh]">
+            
+            <div className="bg-slate-950 text-white p-4 rounded-2xl text-center shadow-inner">
+              <span className="text-[10px] font-semibold tracking-widest text-slate-400 uppercase">USER MANUAL & GUIDELINES</span>
+              <h3 className="text-base font-bold tracking-wide mt-0.5">คู่มือการใช้งานและระเบียบปฏิบัติ</h3>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-6 pr-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                
+                {/* ระเบียบปฏิบัติ & คำแนะนำ */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                    <span className="text-base">📋</span>
+                    <h4 className="font-bold text-xs uppercase">ระเบียบปฏิบัติ และ คำแนะนำ</h4>
+                  </div>
+                  <ul className="text-xs text-slate-600 dark:text-slate-300 space-y-2 list-disc pl-4 leading-relaxed">
+                    <li>กรุณาทำรายการจองล่วงหน้า <strong>ระบบจะตัดรอบจองเวลา 15:00 น. ของทุกวัน</strong></li>
+                    <li>ผู้เดินทางต้องมารอที่จุดรับส่งก่อนเวลาอย่างน้อย <strong>5-10 นาที</strong> หากรถออกไปแล้วจะไม่สามารถวนกลับมารับได้</li>
+                    <li>ตรวจสอบประวัติการจองทุกครั้ง เพื่อความถูกต้องของสายรถและจุดรับส่ง</li>
+                    <li>หากไม่สามารถเดินทางได้ กรุณาแจ้งยกเลิกล่วงหน้าเพื่อเปิดที่นั่งให้พนักงานท่านอื่น</li>
+                  </ul>
+                </div>
+
+                {/* วิธีการจอง */}
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                    <span className="text-base">📱</span>
+                    <h4 className="font-bold text-xs uppercase">วิธีการจอง</h4>
+                  </div>
+                  <ol className="text-xs text-slate-600 dark:text-slate-300 space-y-2 list-decimal pl-4 leading-relaxed">
+                    <li>ไปที่เมนู <strong>ลงทะเบียนจองคิวรถตู้</strong></li>
+                    <li>เลือก <strong>กะการทำงาน</strong> และเลือก <strong>สายรถ</strong> ที่ต้องการ</li>
+                    <li>เลือกประเภทการเดินทาง (ไป-กลับ, ขามา, ขากลับ)</li>
+                    <li>กรอกข้อมูลและเลือก <strong>สถานี/จุดรับส่ง</strong> พร้อมวันที่เดินทาง</li>
+                    <li>ตรวจสอบข้อมูลและกด <strong>ยืนยันสำรองสิทธิ์</strong></li>
+                  </ol>
+                </div>
+
+              </div>
+
+              {/* ติดต่อสอบถาม */}
+              <div className="space-y-2 bg-rose-50 dark:bg-rose-950/30 p-4 rounded-xl border border-rose-200 dark:border-rose-900/50">
+                <div className="flex items-center gap-2 text-rose-700 dark:text-rose-400">
+                  <span className="text-base">📞</span>
+                  <h4 className="font-bold text-xs uppercase">พบปัญหา หรือ ติดต่อสอบถาม</h4>
+                </div>
+                <p className="text-[11px] text-rose-700/90 dark:text-rose-400/90 leading-relaxed">
+                  หากพบปัญหาในการเข้าใช้งาน, ต้องการยกเลิกรอบเดินทางกระทันหัน, หรือลืมของไว้บนรถ สามารถแจ้งแอดมินได้ผ่านหน้า <strong>"กล่องข้อความช่วยเหลือ"</strong> หรือติดต่อฝ่ายธุรการ เบอร์โทรศัพท์: <strong>02-XXX-XXXX</strong>
+                </p>
               </div>
             </div>
-          ) : (
-            <div className="py-12 text-slate-400 text-xs">
-              ยังไม่มีข้อมูลการจองล่าสุด กรุณาทำรายการจองก่อนครับ
+
+            <div className="pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-end">
+              <button 
+                onClick={() => setShowManualModal(false)}
+                className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white px-8 py-2.5 rounded-xl text-xs font-bold cursor-pointer transition-all shadow-md"
+              >
+                รับทราบ / ปิดหน้าต่างนี้
+              </button>
             </div>
-          )}
+
+          </div>
         </div>
       )}
 
