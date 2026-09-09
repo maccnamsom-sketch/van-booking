@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
-// 🟢 นำเข้า doc เพิ่มเติมเพื่อใช้ดึงข้อมูลพนักงานรายบุคคล
 import { collection, query, orderBy, onSnapshot, doc } from 'firebase/firestore';
 import { User, Lock, Bus, AlertCircle } from 'lucide-react'; 
 
@@ -14,12 +13,12 @@ export default function EnterpriseVanBookingSystem() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [activeMenu, setActiveMenu] = useState<'home' | 'booking' | 'history' | 'qrcode' | 'admin' | 'shiftRequest'>('home');
+  
+  const [activeMenu, setActiveMenu] = useState<'home' | 'booking' | 'history' | 'qrcode' | 'manual' | 'admin' | 'shiftRequest' | 'routeMap'>('home');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const isAdmin = user?.email === 'admin@company.com';
 
-  // 🟢 State สำหรับเก็บข้อมูลพนักงานที่จะโชว์มุมขวาบน
   const [employeeData, setEmployeeData] = useState<any>(null);
 
   useEffect(() => {
@@ -88,7 +87,6 @@ export default function EnterpriseVanBookingSystem() {
       setAdHocRequestsList(list);
     });
 
-    // 🟢 ดึงข้อมูลพนักงานจาก Firestore อัตโนมัติ (เพื่อเอาชื่อมาโชว์มุมขวาบน)
     let unsubscribeEmp: any = null;
     if (!isAdmin && user.email) {
       const empId = user.email.split('@')[0];
@@ -287,10 +285,14 @@ export default function EnterpriseVanBookingSystem() {
           <nav className="mt-4 space-y-1 text-xs">
             <button onClick={() => { setActiveMenu('home'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-6 py-3 ${activeMenu === 'home' ? theme.menuActive : theme.menuInactive}`}>หน้าหลัก & ประกาศ</button>
             <button onClick={() => { setActiveMenu('booking'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-6 py-3 ${activeMenu === 'booking' ? theme.menuActive : theme.menuInactive}`}>ลงทะเบียนจองคิวรถตู้</button>
-            
             <button onClick={() => { setActiveMenu('shiftRequest'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-6 py-3 ${activeMenu === 'shiftRequest' ? theme.menuActive : theme.menuInactive}`}>แจ้งขอเปลี่ยนกะ / ออกก่อนเวลา</button>
-            
             <button onClick={() => { setActiveMenu('history'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-6 py-3 ${activeMenu === 'history' ? theme.menuActive : theme.menuInactive}`}>ประวัติการเดินทาง</button>
+            
+            {/* 🟢 ย้าย "ดูแผนที่จำลองเส้นทาง" ลงมาไว้ข้างล่างประวัติการเดินทาง */}
+            <button onClick={() => { setActiveMenu('routeMap'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-6 py-3 flex items-center gap-2 ${activeMenu === 'routeMap' ? theme.menuActive : theme.menuInactive}`}>
+              <span>🗺️</span> ดูแผนที่จำลองเส้นทาง
+            </button>
+
             <button onClick={() => { setActiveMenu('qrcode'); setIsMobileMenuOpen(false); }} className={`w-full text-left px-6 py-3 ${activeMenu === 'qrcode' ? theme.menuActive : theme.menuInactive}`}>คู่มือการใช้งาน</button>
             
             {isAdmin && (
@@ -316,7 +318,6 @@ export default function EnterpriseVanBookingSystem() {
             <div className="text-[11px] md:text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white truncate">ระบบจองรถตู้พนักงานบริษัท แอร์โรเฟลกซ์ จำกัด</div>
           </div>
           
-          {/* 🟢 อัปเดตส่วนแสดงชื่อและแผนกที่มุมขวาบน */}
           <div className="flex items-center gap-3 ml-2 shrink-0">
             <div className="hidden sm:block text-right">
               <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">

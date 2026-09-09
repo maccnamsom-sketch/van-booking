@@ -7,7 +7,7 @@ interface UserViewProps {
   db: any;
   user: any;
   theme: any;
-  activeMenu: 'home' | 'booking' | 'history' | 'qrcode' | 'manual' | 'admin' | 'shiftRequest';
+  activeMenu: 'home' | 'booking' | 'history' | 'qrcode' | 'manual' | 'admin' | 'shiftRequest' | 'routeMap';
   setActiveMenu: (menu: any) => void;
   routesList: any[];
   bookingsList: any[];
@@ -53,9 +53,16 @@ export default function UserView({
   const [ticketFirstMessage, setTicketFirstMessage] = useState('');
   const [isSubmittingTicket, setIsSubmittingTicket] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
-
-  // 🟢 State สำหรับควบคุมการแสดง Modal คู่มือเมื่อ Login เข้ามาครั้งแรก
   const [showManualModal, setShowManualModal] = useState(true);
+  
+  // 🗺️ State สำหรับเลือกดูสายรถในเมนูแผนที่จำลองเส้นทาง
+  const [selectedRouteForMapTab, setSelectedRouteForMapTab] = useState<any>(null);
+
+  useEffect(() => {
+    if (routesList.length > 0 && !selectedRouteForMapTab) {
+      setSelectedRouteForMapTab(routesList[0]);
+    }
+  }, [routesList]);
   
   const [historyFilterDate, setHistoryFilterDate] = useState('');
   const [historyFilterRoute, setHistoryFilterRoute] = useState('');
@@ -81,13 +88,10 @@ export default function UserView({
   const [selectedBookingId, setSelectedBookingId] = useState('');
   const [shiftRequestsList, setShiftRequestsList] = useState<any[]>([]);
 
-  // State สำหรับดึง Config แบบ Realtime
   const [liveConfig, setLiveConfig] = useState<any>(systemConfig);
-  
-  // 🟢 เพิ่ม State สำหรับเก็บข้อมูลพนักงาน (ชื่อ, แผนก, รหัส)
   const [employeeData, setEmployeeData] = useState<any>(null);
 
-  // 🔴 ดึงค่า Config แบบ Realtime จากทั้ง system_settings และ system_config
+  // 🔴 ดึงค่า Config แบบ Realtime
   useEffect(() => {
     if (!db) return;
 
@@ -109,25 +113,26 @@ export default function UserView({
     };
   }, [db]);
 
-  // 🟢 ฟังก์ชันดึงข้อมูลพนักงานจาก Firestore อัตโนมัติ (ดึงจาก Collection: employees)
+  // 🟢 ดึงข้อมูลพนักงานจาก Firestore อัตโนมัติ (แปลงเป็นตัวพิมพ์ใหญ่เสมอเพื่อแก้ปัญหาหาไม่เจอและไม่ติด Permission Denied)
   useEffect(() => {
-    if (!db || !user?.email) return;
+    if (!db || !user) return;
     
-    const empId = user.email.split('@')[0];
+    // ดึงรหัสจาก email เช่น 01a01@mail.com -> 01a01 แล้วแปลงเป็นพิมพ์ใหญ่ (01A01)
+    const empId = user?.email ? user.email.split('@')[0].toUpperCase() : (user?.uid || '01A01');
     
     const unsubEmp = onSnapshot(doc(db, 'employees', empId), (docSnap) => {
       if (docSnap.exists()) {
-        const data = docSnap.data();
-        setEmployeeData(data);
-        if (data.name) setEmployeeName(data.name); 
+        setEmployeeData(docSnap.data());
+      } else {
+        setEmployeeData(null);
       }
     });
 
     return () => unsubEmp();
   }, [db, user]);
 
-  const [employeeName, setEmployeeName] = useState(user?.displayName || user?.name || '');
-  const [employeePhone, setEmployeePhone] = useState(user?.phoneNumber || user?.phone || '');
+  const [employeeName, setEmployeeName] = useState('');
+  const [employeePhone, setEmployeePhone] = useState('');
 
   const checkIsBookingOpen = () => {
     const config = liveConfig || systemConfig || {};
@@ -168,12 +173,7 @@ export default function UserView({
         setEmployeePhone(user.phoneNumber || user.phone);
       }
     }
-    const myLastBooking = bookingsList.find(b => b.employeeEmail === (user?.email || 'employee@company.com'));
-    if (myLastBooking) {
-      if (!employeeName && myLastBooking.employeeName && !employeeData?.name) setEmployeeName(myLastBooking.employeeName);
-      if (!employeePhone && myLastBooking.employeePhone) setEmployeePhone(myLastBooking.employeePhone);
-    }
-  }, [user, bookingsList, employeeData]);
+  }, [user, employeeData]);
 
   const myTickets = supportTicketsList.filter(t => t.employeeEmail === (user?.email || 'employee@company.com'));
   const myBookings = bookingsList.filter(b => b.employeeEmail === (user?.email || 'employee@company.com'));
@@ -349,7 +349,7 @@ export default function UserView({
     try {
       await addDoc(collection(db, 'shiftRequests'), {
         employeeEmail: user?.email || 'employee@company.com',
-        employeeName: employeeName || user?.email || 'พนักงาน',
+        employeeName: employeeData?.name || employeeName || 'พนักงาน',
         requestDate: shiftReqDate,
         originalShift: shiftReqOriginal,
         requestedTime: shiftReqNewTime,
@@ -370,10 +370,19 @@ export default function UserView({
 
   const activeStations = getRouteStations(filteredRoutesList.find(r => r.id === selectedRouteId) || filteredRoutesList[0] || routesList[0]);
 
+  // กำหนดตัวแปรแสดงชื่อและแผนก
+  const rawIdFromEmail = user?.email ? user.email.split('@')[0] : '01A01';
+  const isUserAdmin = user?.email?.includes('admin') || employeeData?.employeeId?.toUpperCase() === 'ADMIN' || employeeData?.role === 'admin';
+  const displayEmployeeCode = isUserAdmin ? 'ADMIN' : (employeeData?.employeeId || rawIdFromEmail).toUpperCase();
+  
+  // ใช้ข้อมูลจาก Database เป็นหลัก ถ้ายังโหลดไม่เสร็จจะขึ้นกำลังโหลด...
+  const displayEmployeeName = employeeData?.name || (employeeData === null ? 'ไม่พบชื่อในระบบ' : 'กำลังโหลดชื่อ...');
+  const displayDepartment = employeeData?.department || (employeeData === null ? '-' : 'กำลังโหลดแผนก...');
+
   return (
     <div className="text-sm text-slate-800 dark:text-slate-100">
       
-      {/* 🟢 TOP BAR: REALTIME CLOCK & STATUS */}
+      {/* 🟢 TOP BAR: REALTIME CLOCK & STATUS + FULL EMPLOYEE INFO */}
       <div className="max-w-4xl mx-auto mb-3.5 px-4 py-2 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-xs flex items-center justify-between gap-3 transition-all">
         
         <div className="flex items-center gap-2.5 flex-wrap">
@@ -404,17 +413,16 @@ export default function UserView({
           </div>
         </div>
 
-        {employeeData && (
-          <div className="flex items-center gap-3 border-l border-slate-200 dark:border-slate-700 pl-3">
-            <div className="hidden sm:block text-right">
-              <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">{employeeData.name}</p>
-              <p className="text-[9px] font-medium text-slate-500">แผนก: {employeeData.department}</p>
-            </div>
-            <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900/50 flex items-center justify-center text-blue-600 dark:text-blue-400 font-bold text-[10px] border border-blue-200 dark:border-blue-800">
-              {employeeData.employeeId}
-            </div>
+        {/* 🟢 แสดงชื่อพนักงาน แผนก และรหัสพนักงาน */}
+        <div className="flex items-center gap-3 border-l border-slate-200 dark:border-slate-700 pl-3">
+          <div className="text-right">
+            <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">{displayEmployeeName}</p>
+            <p className="text-[9px] font-medium text-slate-500 dark:text-slate-400">Department: {displayDepartment}</p>
           </div>
-        )}
+          <div className="bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 text-xs font-bold px-2.5 py-1 rounded-full shadow-2xs font-mono">
+            {displayEmployeeCode}
+          </div>
+        </div>
 
       </div>
 
@@ -432,7 +440,7 @@ export default function UserView({
             </div>
           )}
 
-          {/* 🌟 กล่องข้อความต้อนรับสีน้ำเงินเข้ม (สลับขึ้นมาไว้ด้านบนสุด) */}
+          {/* 🌟 กล่องข้อความต้อนรับสีน้ำเงินเข้ม (อยู่ด้านบน) */}
           <div className="relative overflow-hidden bg-gradient-to-br from-blue-900 via-slate-900 to-slate-950 p-6 md:p-8 rounded-2xl text-white shadow-xl border border-slate-800">
             <div className="relative z-10 max-w-2xl space-y-3">
               <div className="flex flex-wrap items-center gap-2">
@@ -449,7 +457,7 @@ export default function UserView({
             </div>
           </div>
 
-          {/* 🌟 เมนูลัดขนาดใหญ่ 4 สี (สลับลงมาไว้ด้านล่างกล่องต้อนรับ) */}
+          {/* 🌟 เมนูลัดขนาดใหญ่ 4 สี (อยู่ด้านล่างกล่องต้อนรับ) */}
           <div className="bg-white dark:bg-slate-900 p-4.5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-md space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">เมนูลัดใช้งานด่วน (กดเลือกเมนูที่ต้องการได้ทันที)</h3>
@@ -659,6 +667,135 @@ export default function UserView({
               </div>
             </form>
           </div>
+        </div>
+      )}
+
+      {/* 🗺️ ROUTE MAP SIMULATION TAB (เพิ่มเติมตามที่คุณต้องการ) */}
+      {activeMenu === 'routeMap' && (
+        <div className="max-w-4xl mx-auto space-y-5">
+          <div className="border-b border-slate-200 dark:border-slate-800 pb-3 flex justify-between items-center">
+            <div>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider">🗺️ แผนที่และระบบจำลองเส้นทางรถสวัสดิการ</h3>
+              <p className="text-xs text-slate-400 mt-0.5">เลือกสายรถด้านล่างเพื่อตรวจสอบรายละเอียดเส้นทาง จุดจอดรับ-ส่ง และเวลาเดินรถ</p>
+            </div>
+            <span className="text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 px-3 py-1 rounded-full border border-indigo-200 dark:border-indigo-800">
+              ทั้งหมด {routesList.length} สายรถ
+            </span>
+          </div>
+
+          {routesList.length === 0 ? (
+            <div className="p-12 text-center border border-dashed rounded-2xl text-slate-400 text-xs bg-white dark:bg-slate-900">
+              ยังไม่มีข้อมูลสายรถในระบบ
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {/* รายชื่อสายรถด้านซ้าย */}
+              <div className="md:col-span-1 space-y-2.5 max-h-[600px] overflow-y-auto pr-1">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">เลือกสายรถที่ต้องการตรวจสอบ</p>
+                {routesList.map((r: any) => {
+                  const isSelected = selectedRouteForMapTab?.id === r.id;
+                  return (
+                    <div 
+                      key={r.id}
+                      onClick={() => setSelectedRouteForMapTab(r)}
+                      className={`p-4 rounded-2xl border transition-all cursor-pointer text-left space-y-1.5 ${
+                        isSelected 
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-md ring-2 ring-indigo-600/20' 
+                          : 'bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 border-slate-200 dark:border-slate-800 hover:border-indigo-300'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start">
+                        <span className="font-bold text-xs">{r.name}</span>
+                        <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>
+                          {r.shiftType || 'ทุกกะ'}
+                        </span>
+                      </div>
+                      <p className={`text-[11px] ${isSelected ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-400'}`}>
+                        🚐 ทะเบียน: {r.plate || r.vanPlate || '-'}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* รายละเอียดแผนผังจำลองเส้นทางด้านขวา */}
+              <div className="md:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl space-y-5">
+                {selectedRouteForMapTab ? (
+                  <>
+                    <div className="border-b border-slate-100 dark:border-slate-800 pb-4 space-y-2">
+                      <div className="flex justify-between items-start">
+                        <h4 className="font-bold text-base text-slate-900 dark:text-white">
+                          เส้นทางเดินรถ: {selectedRouteForMapTab.name}
+                        </h4>
+                        <span className="bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 px-3 py-1 rounded-full text-xs font-bold">
+                          {selectedRouteForMapTab.shiftType || 'ทุกกะ'}
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-4 text-xs text-slate-500 dark:text-slate-400 pt-1">
+                        <span>🚐 ทะเบียนรถ: <strong className="text-slate-800 dark:text-white font-mono">{selectedRouteForMapTab.plate || selectedRouteForMapTab.vanPlate || '-'}</strong></span>
+                        <span>👤 พนักงานขับรถ: <strong className="text-slate-800 dark:text-white">{selectedRouteForMapTab.driver || selectedRouteForMapTab.driverName || '-'}</strong></span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <h5 className="font-bold text-xs text-slate-400 uppercase tracking-wider">ลำดับจุดจอดรับ-ส่งตามเส้นทาง</h5>
+                        <div className="flex items-center gap-1.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 px-2.5 py-1 rounded-full text-[10px] font-bold border border-indigo-200 dark:border-indigo-800">
+                          <span className="animate-bounce">🚐</span> รถตู้วิ่งรับส่งพนักงาน
+                        </div>
+                      </div>
+                      
+                      <div className="max-h-[420px] overflow-y-auto pr-2 py-2">
+                        {getRouteStations(selectedRouteForMapTab).length > 0 ? (
+                          <div className="relative pl-6 space-y-5 before:content-[''] before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-indigo-200 dark:before:bg-indigo-900">
+                            {getRouteStations(selectedRouteForMapTab).map((st: any, idx: number, arr: any[]) => {
+                              const isFirst = idx === 0;
+                              const isLast = idx === arr.length - 1;
+
+                              return (
+                                <div key={idx} className="relative flex items-start gap-3">
+                                  <div className={`absolute -left-6 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold border-2 transition-all ${
+                                    isFirst 
+                                      ? 'bg-emerald-500 text-white border-emerald-600 ring-4 ring-emerald-500/20' 
+                                      : isLast 
+                                      ? 'bg-blue-600 text-white border-blue-700 ring-4 ring-blue-600/20' 
+                                      : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-indigo-500'
+                                  }`}>
+                                    {st.index}
+                                  </div>
+
+                                  <div className="flex-1 bg-slate-50 dark:bg-slate-950 p-3.5 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-2xs flex justify-between items-center">
+                                    <div>
+                                      <span className="font-bold text-slate-900 dark:text-white block text-xs">
+                                        {isFirst ? '🟢 จุดเริ่มต้น: ' : isLast ? '🏁 จุดสิ้นสุด/บริษัท: บริษัท แอร์โรเฟลกซ์ จำกัด' : `จุดจอดรับที่ ${st.index}: `}
+                                        {!isLast ? st.name : ''}
+                                      </span>
+                                      <span className="text-[10px] text-slate-400">
+                                        {isFirst ? 'จุดเริ่มปล่อยรถ / รับพนักงานต้นทาง' : isLast ? 'สถานีปลายทาง สำนักงานใหญ่ระยอง' : 'จุดจอดรับส่งพนักงานระหว่างทาง'}
+                                      </span>
+                                    </div>
+                                    <div className="bg-white dark:bg-slate-900 px-3 py-1 rounded-xl font-mono font-bold text-indigo-600 dark:text-indigo-400 text-xs border border-slate-200 dark:border-slate-800 shadow-2xs">
+                                      {!isLast ? `⏱️ ${st.time} น.` : '🏁 ถึงที่หมาย'}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div className="text-center py-12 text-slate-400 border border-dashed rounded-2xl">
+                            ยังไม่มีการกำหนดข้อมูลสถานีจุดจอดสำหรับสายรถนี้
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center py-20 text-slate-400 text-xs">กรุณาเลือกสายรถทางด้านซ้าย</div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -892,12 +1029,12 @@ export default function UserView({
                       />
                     </div>
 
-                    {employeeData?.department && (
+                    {displayDepartment && (
                       <div>
                         <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">แผนก / องค์กร</label>
                         <input 
                           type="text" 
-                          value={employeeData.department} 
+                          value={displayDepartment} 
                           readOnly 
                           className="w-full border border-slate-300 dark:border-slate-700 bg-slate-200/60 dark:bg-slate-800 p-2.5 rounded-xl text-slate-600 dark:text-slate-300 text-xs cursor-not-allowed" 
                         />
@@ -994,7 +1131,7 @@ export default function UserView({
                     </button>
                     <button 
                       onClick={() => {
-                        if (!employeeName.trim() || !employeePhone.trim()) {
+                        if (!employeeName.trim() && !displayEmployeeName) {
                           showAlert('warning', 'ข้อมูลไม่ครบถ้วน', 'กรุณากรอกชื่อและเบอร์โทรศัพท์พนักงาน');
                           return;
                         }
@@ -1020,8 +1157,8 @@ export default function UserView({
                       <p><strong>กะทำงาน:</strong> {shiftType === 'Day' ? 'กะ Day' : 'กะ Shift'} ({shiftTimeSlot})</p>
                       <p><strong>ประเภทการเดินทาง:</strong> {tripType === 'roundTrip' ? 'ไป-กลับ' : tripType === 'inboundOnly' ? 'เฉพาะขามา' : 'เฉพาะขากลับ'}</p>
                       <p><strong>สายรถ:</strong> {selectedRouteName}</p>
-                      <p><strong>ชื่อผู้เดินทาง:</strong> {employeeName} {employeeData?.department ? `(${employeeData.department})` : ''}</p>
-                      <p><strong>เบอร์โทรศัพท์:</strong> {employeePhone}</p>
+                      <p><strong>ชื่อผู้เดินทาง:</strong> {displayEmployeeName} ({displayDepartment})</p>
+                      <p><strong>เบอร์โทรศัพท์:</strong> {employeePhone || '-'}</p>
                       <p><strong>จุดรับ-ส่ง:</strong> จุดที่ #{activeStations[selectedStationIndex]?.index}: {activeStations[selectedStationIndex]?.name} ({activeStations[selectedStationIndex]?.time})</p>
                     </div>
                     
@@ -1053,7 +1190,7 @@ export default function UserView({
                         }
 
                         const currentActiveRoute = filteredRoutesList.find(r => r.id === selectedRouteId) || filteredRoutesList[0] || routesList[0];
-                        if (!currentActiveRoute || !travelDate || !employeeName || !employeePhone) {
+                        if (!currentActiveRoute || !travelDate) {
                           showAlert('warning', 'ข้อมูลไม่ครบถ้วน', 'กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน');
                           return;
                         }
@@ -1062,6 +1199,7 @@ export default function UserView({
                         const stationsList = getRouteStations(currentActiveRoute);
                         const targetStation = stationsList[selectedStationIndex];
                         const currentEmployeeEmail = user?.email || 'employee@company.com';
+                        const finalEmpName = displayEmployeeName;
 
                         setIsBookingLoading(true);
                         try {
@@ -1070,8 +1208,8 @@ export default function UserView({
                             const { adjustedDate } = checkCutoffTimeAndAdjustDate(d);
                             const bookingData = {
                               employeeEmail: currentEmployeeEmail, 
-                              employeeName, 
-                              employeePhone,
+                              employeeName: finalEmpName, 
+                              employeePhone: employeePhone || '-',
                               route: selectedRouteName, 
                               pickupLocation: `จุดที่ ${targetStation?.index || 1}: ${targetStation?.name || 'ไม่ระบุ'}`, 
                               time: targetStation?.time || 'ไม่ระบุ',
@@ -1092,8 +1230,8 @@ export default function UserView({
                             setRecentBooking({ 
                               id: lastDocRef.id, 
                               employeeEmail: currentEmployeeEmail, 
-                              employeeName, 
-                              employeePhone, 
+                              employeeName: finalEmpName, 
+                              employeePhone: employeePhone || '-', 
                               route: selectedRouteName, 
                               travelDate, 
                               shiftType, 
@@ -1368,7 +1506,7 @@ export default function UserView({
         </div>
       )}
 
-      {/* 🟢 MODAL อัตโนมัติ: คู่มือการใช้งานและระเบียบปฏิบัติ (เด้งขึ้นมาทันทีเมื่อ Login สำเร็จ และไม่มีแผนที่) */}
+      {/* 🟢 MODAL อัตโนมัติ: คู่มือการใช้งานและระเบียบปฏิบัติ */}
       {showManualModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-fadeIn">
           <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl p-6 md:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 space-y-6 text-sm text-slate-800 dark:text-slate-100 flex flex-col max-h-[90vh]">
