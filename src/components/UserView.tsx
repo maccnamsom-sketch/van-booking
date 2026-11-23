@@ -19,6 +19,9 @@ interface UserViewProps {
   systemConfig?: any;
 }
 
+const THAI_WEEKDAYS_SHORT = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.'];
+const THAI_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+
 export default function UserView({ 
   db, 
   user, 
@@ -66,14 +69,30 @@ export default function UserView({
   
   const [historyFilterDate, setHistoryFilterDate] = useState('');
   const [historyFilterRoute, setHistoryFilterRoute] = useState('');
-  
-  const getTodayDateString = () => {
-    const today = new Date();
-    const yyyy = today.getFullYear();
-    const mm = String(today.getMonth() + 1).padStart(2, '0');
-    const dd = String(today.getDate()).padStart(2, '0');
+
+  const formatDateToYMD = (dObj: Date) => {
+    const yyyy = dObj.getFullYear();
+    const mm = String(dObj.getMonth() + 1).padStart(2, '0');
+    const dd = String(dObj.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
   };
+  
+  const getTodayDateString = () => {
+    return formatDateToYMD(currentTime || new Date());
+  };
+
+  const getUpcomingDates = (daysCount = 14) => {
+    const list: string[] = [];
+    const refNow = currentTime || new Date();
+    for (let i = 0; i < daysCount; i++) {
+      const d = new Date(refNow.getFullYear(), refNow.getMonth(), refNow.getDate() + i);
+      list.push(formatDateToYMD(d));
+    }
+    return list;
+  };
+
+  const todayStr = getTodayDateString();
+  const upcomingDatesList = getUpcomingDates(14);
 
   const [selectedSummaryDate, setSelectedSummaryDate] = useState(getTodayDateString());
   const [activeChatTicketId, setActiveChatTicketId] = useState<string | null>(null);
@@ -220,14 +239,13 @@ export default function UserView({
 
   const [shiftType, setShiftType] = useState<'Day' | 'Shift'>('Day');
   const [shiftTimeSlot, setShiftTimeSlot] = useState<string>('08:00 - 17:00');
-  const [tripType, setTripType] = useState<'roundTrip' | 'inboundOnly' | 'outboundOnly'>('roundTrip');
+  const [tripType] = useState<'roundTrip' | 'inboundOnly' | 'outboundOnly'>('roundTrip');
 
-  // กรองสายรถตามกะ และแยกตามช่วงเวลาของกะ Shift
   const filteredRoutesList = routesList.filter(r => {
     if (!r.shiftType || r.shiftType === 'All' || r.shiftType === ' ทุกกะ') return true;
     if (r.shiftType !== shiftType) return false;
     if (shiftType === 'Shift') {
-      if (!r.shiftTimeSlot) return true; // รองรับสายรถเก่าที่ยังไม่ได้ตั้งค่าช่วงเวลา
+      if (!r.shiftTimeSlot) return true;
       return r.shiftTimeSlot === shiftTimeSlot;
     }
     return true;
@@ -239,7 +257,6 @@ export default function UserView({
   const [selectedStationIndex, setSelectedStationIndex] = useState<number>(0);
   const [travelDate, setTravelDate] = useState('');
 
-  // อัปเดตสายรถที่เลือกอัตโนมัติเมื่อเปลี่ยนกะหรือเปลี่ยนช่วงเวลาของกะ Shift
   useEffect(() => {
     if (filteredRoutesList.length > 0) {
       if (!filteredRoutesList.some(r => r.id === selectedRouteId)) {
@@ -255,7 +272,6 @@ export default function UserView({
     }
   }, [shiftType, shiftTimeSlot, routesList]);
 
-  const todayStr = getTodayDateString();
   const summaryBookings = bookingsList.filter(b => b.travelDate === selectedSummaryDate);
 
   const filteredHistory = myBookings.filter((b: any) => {
@@ -274,6 +290,31 @@ export default function UserView({
     return `${dd}/${mm}/${yyyy}`;
   };
 
+  const formatShortThaiDateButton = (dateStr: string) => {
+    if (!dateStr) return { dayLabel: '', dateLabel: '' };
+    const [yyyy, mm, dd] = dateStr.split('-').map(Number);
+    const dObj = new Date(Date.UTC(yyyy || 2026, (mm || 1) - 1, dd || 1));
+    const dayLabel = THAI_WEEKDAYS_SHORT[dObj.getUTCDay()] || '';
+    const monthLabel = THAI_MONTHS_SHORT[(mm || 1) - 1] || '';
+    return {
+      dayLabel,
+      dateLabel: `${dd} ${monthLabel}`
+    };
+  };
+
+  const selectedDatesArray = travelDate
+    ? travelDate.split(',').map((d: string) => d.trim()).filter(Boolean)
+    : [];
+
+  const toggleDateSelection = (dateStr: string) => {
+    const exists = selectedDatesArray.includes(dateStr);
+    const nextList = exists
+      ? selectedDatesArray.filter((item) => item !== dateStr)
+      : [...selectedDatesArray, dateStr];
+    nextList.sort();
+    setTravelDate(nextList.join(','));
+  };
+
   const getRouteStations = (route: any) => {
     if (!route) return [];
     const rawStops = route.stops || route.stations || [];
@@ -285,19 +326,15 @@ export default function UserView({
   };
 
   const checkCutoffTimeAndAdjustDate = (inputDate: string) => {
-    const now = new Date();
+    const now = currentTime || new Date();
     const currentHour = now.getHours();
     const currentMinute = now.getMinutes();
     const currentTimeInMinutes = currentHour * 60 + currentMinute;
     const cutoffTimeInMinutes = 15 * 60;
 
     if (inputDate === getTodayDateString() && currentTimeInMinutes >= cutoffTimeInMinutes) {
-      const tomorrow = new Date();
-      tomorrow.setDate(now.getDate() + 1);
-      const yyyy = tomorrow.getFullYear();
-      const mm = String(tomorrow.getMonth() + 1).padStart(2, '0');
-      const dd = String(tomorrow.getDate()).padStart(2, '0');
-      return { adjustedDate: `${yyyy}-${mm}-${dd}`, isAdjusted: true };
+      const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      return { adjustedDate: formatDateToYMD(tomorrow), isAdjusted: true };
     }
     return { adjustedDate: inputDate, isAdjusted: false };
   };
@@ -390,285 +427,329 @@ export default function UserView({
   const displayDepartment = employeeData?.department || (employeeData === null ? '-' : 'กำลังโหลดแผนก...');
 
   return (
-    <div className="text-sm text-slate-800 dark:text-slate-100">
+    <div className="min-h-screen bg-[#D8E1F3] dark:bg-[#0B1020] p-3 sm:p-5 text-sm text-slate-800 dark:text-slate-100">
       
-      {/* 🟢 TOP BAR: REALTIME CLOCK & STATUS + FULL EMPLOYEE INFO */}
-      <div className="max-w-4xl mx-auto mb-3.5 px-4 py-2 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 rounded-2xl shadow-xs flex items-center justify-between gap-3 transition-all">
-        
-        <div className="flex items-center gap-2.5 flex-wrap">
-          <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold tracking-wide border transition-all ${
-            isSystemOpen 
-              ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/50' 
-              : 'bg-rose-50 text-rose-700 border-rose-200/80 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800/50'
-          }`}>
-            <span className="relative flex h-2 w-2">
-              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isSystemOpen ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
-              <span className={`relative inline-flex rounded-full h-2 w-2 ${isSystemOpen ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
-            </span>
-            <span>{isSystemOpen ? 'เปิดรับจอง' : 'ปิดรับจอง'}</span>
+      {/* TOP BAR: ข้อมูลสถานะและพนักงาน */}
+      <div className="max-w-5xl mx-auto mb-5 px-4 sm:px-5 py-4 bg-[#EDF2FC] dark:bg-[#151E35] border border-white/70 dark:border-slate-700 rounded-3xl shadow-[7px_7px_18px_rgba(65,82,125,0.12),-7px_-7px_18px_rgba(255,255,255,0.75)]">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-bold border ${
+              isSystemOpen
+                ? 'bg-[#DCE5F7] text-[#202B50] border-white/70 dark:bg-sky-950/40 dark:text-sky-300 dark:border-sky-800'
+                : 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800'
+            }`}>
+              <span className={`w-2 h-2 rounded-full ${isSystemOpen ? 'bg-[#202B50] dark:bg-sky-400' : 'bg-rose-500'}`} />
+              {isSystemOpen ? 'เปิดรับจอง' : 'ปิดรับจอง'}
+            </div>
+
+            <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+              <span>📅</span>
+              <span>
+                {currentTime
+                  ? `${THAI_WEEKDAYS_SHORT[currentTime.getDay()]} ${currentTime.getDate()} ${THAI_MONTHS_SHORT[currentTime.getMonth()]} ${currentTime.getFullYear() + 543}`
+                  : '---'}
+              </span>
+              <span className="font-mono font-bold text-[#202B50] dark:text-sky-300 bg-[#DCE5F7] dark:bg-slate-800 px-2.5 py-1 rounded-lg">
+                {currentTime ? currentTime.toLocaleTimeString('en-US', { hour12: false }) : '00:00:00'}
+              </span>
+            </div>
           </div>
 
-          <div className="h-3.5 w-[1px] bg-slate-200 dark:bg-slate-800 hidden sm:block"></div>
-
-          <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300 font-medium">
-            <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <span>
-              {currentTime ? currentTime.toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) : '---'}
-            </span>
-            <span className="font-mono font-bold text-slate-800 dark:text-slate-100 bg-slate-100 dark:bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-200/60 dark:border-slate-700/60 text-[11px]">
-              {currentTime ? currentTime.toLocaleTimeString('en-US', { hour12: false }) : '00:00:00'}
+          <div className="flex items-center gap-3 sm:border-l sm:border-[#C5D2EC] dark:sm:border-slate-700 sm:pl-4">
+            <div className="w-10 h-10 rounded-2xl bg-[#DCE5F7] text-[#202B50] dark:bg-sky-950 dark:text-sky-300 flex items-center justify-center text-lg">
+              👤
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-slate-800 dark:text-white truncate">{displayEmployeeName}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">แผนก: {displayDepartment}</p>
+            </div>
+            <span className="ml-auto bg-[#DCE5F7] dark:bg-sky-950/50 text-[#202B50] dark:text-sky-300 border border-white/70 dark:border-sky-800 text-xs font-bold px-3 py-1.5 rounded-xl">
+              {displayEmployeeCode}
             </span>
           </div>
         </div>
-
-        <div className="flex items-center gap-3 border-l border-slate-200 dark:border-slate-700 pl-3">
-          <div className="text-right">
-            <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">{displayEmployeeName}</p>
-            <p className="text-[9px] font-medium text-slate-500 dark:text-slate-400">Department: {displayDepartment}</p>
-          </div>
-          <div className="bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 text-xs font-bold px-2.5 py-1 rounded-full shadow-2xs font-mono">
-            {displayEmployeeCode}
-          </div>
-        </div>
-
       </div>
 
-      {/* 1. HOME TAB */}
+      {/* HOME TAB - NAVY & SKY MINIMAL DESIGN */}
       {activeMenu === 'home' && (
-        <div className="max-w-4xl mx-auto space-y-5">
-          
+        <div className="max-w-5xl mx-auto space-y-5 sm:space-y-6">
+
+          {/* Welcome Header */}
+          <section className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-[#202B50] via-[#17213F] to-[#0B1020] p-6 sm:p-8 text-white shadow-[8px_8px_24px_rgba(25,38,75,0.18),-8px_-8px_24px_rgba(255,255,255,0.65)]">
+            <div className="absolute -right-10 -top-14 w-48 h-48 rounded-full bg-white/10" />
+            <div className="absolute right-24 -bottom-20 w-44 h-44 rounded-full bg-white/10" />
+            <div className="relative z-10 max-w-xl">
+              <span className="inline-flex items-center gap-2 bg-white/15 border border-white/20 rounded-full px-3 py-1.5 text-[11px] font-semibold mb-4">
+                ✨ CENTRAL TRANSPORT HUB
+              </span>
+              <p className="text-sky-100 text-sm mb-1">ยินดีต้อนรับ</p>
+              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                {displayEmployeeName}
+              </h2>
+              <p className="text-sky-50 text-xs sm:text-sm mt-3 leading-relaxed">
+                ระบบจองรถตู้พนักงาน บริษัท แอร์โรเฟลกซ์ จำกัด
+                <br />
+                ตรวจสอบข้อมูลการเดินทางและสำรองที่นั่งได้ที่นี่
+              </p>
+            </div>
+            <div className="relative z-10 mt-5 flex flex-wrap gap-2">
+              <span className="bg-white/15 border border-white/20 rounded-xl px-3 py-2 text-xs">
+                🕒 ตัดรอบจอง 15:00 น.
+              </span>
+              <span className="bg-white/15 border border-white/20 rounded-xl px-3 py-2 text-xs">
+                🚐 ระบบจองรถพนักงาน
+              </span>
+            </div>
+          </section>
+
+          {/* Booking Closed Notice */}
           {!isSystemOpen && (
-            <div className="p-4 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 rounded-2xl text-rose-700 dark:text-rose-300 flex items-center gap-3 shadow-sm animate-pulse">
-              <span className="text-2xl">🔒</span>
+            <div className="flex items-start gap-3 p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900">
+              <span className="w-10 h-10 shrink-0 rounded-xl bg-[#DCE5F7] text-[#202B50] dark:bg-rose-950 dark:text-rose-300 flex items-center justify-center text-xl">🔒</span>
               <div>
-                <h4 className="font-bold text-sm">ขณะนี้ระบบปิดรับการจองรถตู้ชั่วคราว</h4>
-                <p className="text-xs opacity-90">{closeReasonMessage}</p>
+                <h4 className="font-bold text-sm text-rose-700 dark:text-rose-300">ขณะนี้ระบบปิดรับการจองรถตู้ชั่วคราว</h4>
+                <p className="text-xs text-rose-600 dark:text-rose-400 mt-1">{closeReasonMessage}</p>
               </div>
             </div>
           )}
 
-          <div className="relative overflow-hidden bg-gradient-to-br from-blue-900 via-slate-900 to-slate-950 p-6 md:p-8 rounded-2xl text-white shadow-xl border border-slate-800">
-            <div className="relative z-10 max-w-2xl space-y-3">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="bg-white/10 text-slate-200 text-[10px] font-semibold tracking-wider uppercase px-3 py-1 rounded-full backdrop-blur-md border border-white/10">Central Transport Hub</span>
-                <button 
-                  onClick={() => setShowSummaryModal(true)}
-                  className="bg-emerald-600/90 hover:bg-emerald-600 text-white text-[11px] font-medium px-3 py-1 rounded-full transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
-                >
-                  ตรวจสอบรายชื่อผู้เดินทางประจำวัน ({bookingsList.filter(b => b.travelDate === todayStr).length})
-                </button>
+          {/* Main Actions */}
+          <section className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              onClick={() => setShowSummaryModal(true)}
+              className="group flex items-center gap-4 p-5 bg-[#EDF2FC] dark:bg-[#151E35] rounded-3xl border border-white/70 dark:border-slate-700 shadow-[7px_7px_18px_rgba(65,82,125,0.12),-7px_-7px_18px_rgba(255,255,255,0.75)] hover:brightness-102 transition-all text-left cursor-pointer"
+            >
+              <div className="w-14 h-14 shrink-0 rounded-2xl bg-[#DCE5F7] text-[#202B50] dark:bg-sky-950 dark:text-sky-300 flex items-center justify-center text-2xl group-hover:scale-105 transition-transform">
+                👥
               </div>
-              <h2 className="text-lg md:text-xl font-bold tracking-tight text-white">ระบบจองรถตู้พนักงานบริษัท แอร์โรเฟลกซ์ จำกัด</h2>
-              <p className="text-xs text-slate-300 font-normal leading-relaxed">ระบบสารสนเทศสำหรับการตรวจสอบข้อมูลเดินรถ ตารางเวลาสถานีรับส่ง และลงทะเบียนเพื่อสำรองที่นั่งพนักงานส่วนกลางขององค์กร (ตัดรอบจองเวลา 15.00 น.)</p>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-bold text-slate-800 dark:text-white text-sm sm:text-base">ตรวจรายชื่อผู้เดินทาง</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">ตรวจสอบรายชื่อและสายรถของวันนี้</p>
+                <span className="inline-flex mt-2 text-xs font-bold text-[#202B50] dark:text-sky-300">
+                  {bookingsList.filter(b => b.travelDate === todayStr).length} คนเดินทางวันนี้
+                </span>
+              </div>
+              <span className="text-[#202B50] dark:text-sky-300 text-xl">›</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setBookingStep(1);
+                setActiveMenu('booking');
+              }}
+              className="group flex items-center gap-4 p-5 rounded-3xl bg-gradient-to-br from-[#17213F] to-[#0B1020] text-white shadow-[6px_8px_20px_rgba(17,26,56,0.25)] hover:brightness-110 transition-all text-left cursor-pointer"
+            >
+              <div className="w-14 h-14 shrink-0 rounded-2xl bg-[#DCE5F7] text-[#202B50] flex items-center justify-center text-2xl group-hover:scale-105 transition-transform">
+                🚐
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-bold text-sm sm:text-base">จองรถตู้ทันที</h3>
+                <p className="text-xs text-sky-100 mt-1">เลือกวัน กะ และสายรถที่ต้องการ</p>
+                <span className="inline-flex mt-2 text-xs font-bold text-white">
+                  เริ่มจองเลย →
+                </span>
+              </div>
+            </button>
+          </section>
+
+          {/* Quick Menu */}
+          <section className="bg-[#EDF2FC] dark:bg-[#151E35] rounded-3xl border border-white/70 dark:border-slate-700 p-5 sm:p-6 shadow-[7px_7px_18px_rgba(65,82,125,0.12),-7px_-7px_18px_rgba(255,255,255,0.75)]">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="font-bold text-slate-800 dark:text-white text-base">เมนูใช้งานด่วน</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">เลือกบริการที่ต้องการใช้งาน</p>
+              </div>
+              <span className="w-10 h-10 rounded-2xl bg-[#DCE5F7] text-[#202B50] dark:bg-sky-950 dark:text-sky-300 flex items-center justify-center text-xl">💠</span>
             </div>
-          </div>
 
-          <div className="bg-white dark:bg-slate-900 p-4.5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-md space-y-3">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
-              <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">เมนูลัดใช้งานด่วน (กดเลือกเมนูที่ต้องการได้ทันที)</h3>
-              <span className="text-[11px] text-slate-400">สำหรับพนักงาน</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {[
+                { icon: '🚐', title: 'ลงทะเบียนจองรถตู้', desc: 'สำรองที่นั่งเดินทาง', action: () => { setBookingStep(1); setActiveMenu('booking'); } },
+                { icon: '📋', title: 'ประวัติการเดินทาง', desc: 'ตรวจสอบรายการจอง', action: () => setActiveMenu('history') },
+                { icon: '🕒', title: 'ขอเปลี่ยนกะ / ออกก่อน', desc: 'ส่งคำขอถึงผู้ดูแลระบบ', action: () => setActiveMenu('shiftRequest') },
+                { icon: '🗺️', title: 'แผนที่เส้นทาง', desc: 'ตรวจสอบสายรถและจุดจอด', action: () => setActiveMenu('routeMap') },
+                { icon: '📖', title: 'คู่มือการใช้งาน', desc: 'อ่านวิธีใช้งานระบบ', action: () => setActiveMenu('manual') },
+              ].map((item, index) => (
+                <button
+                  key={index}
+                  onClick={item.action}
+                  className="flex items-center gap-3 p-4 rounded-2xl bg-white/80 dark:bg-slate-950/80 border border-white/80 dark:border-slate-800 hover:bg-white dark:hover:bg-slate-900 transition-all text-left cursor-pointer"
+                >
+                  <span className="w-11 h-11 shrink-0 rounded-xl bg-[#DCE5F7] text-[#202B50] dark:bg-sky-950 dark:text-sky-300 flex items-center justify-center text-xl">
+                    {item.icon}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-bold text-slate-800 dark:text-white">{item.title}</span>
+                    <span className="block text-xs text-slate-500 dark:text-slate-400 mt-1">{item.desc}</span>
+                  </span>
+                  <span className="text-[#202B50] dark:text-sky-300">›</span>
+                </button>
+              ))}
             </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              <button 
-                onClick={() => setActiveMenu('booking')}
-                className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-all active:scale-98 cursor-pointer text-left border border-blue-500"
-              >
-                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl shrink-0">
-                  🚐
-                </div>
-                <div>
-                  <span className="block text-sm font-bold text-white">ลงทะเบียนจองรถตู้</span>
-                  <span className="text-[11px] text-blue-100">กดเพื่อสำรองที่นั่งเดินทาง</span>
-                </div>
-              </button>
+          </section>
 
-              <button 
-                onClick={() => setActiveMenu('history')}
-                className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-md transition-all active:scale-98 cursor-pointer text-left border border-emerald-500"
-              >
-                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl shrink-0">
-                  📋
-                </div>
+          {/* Announcements */}
+          <section className="bg-[#EDF2FC] dark:bg-[#151E35] rounded-3xl border border-white/70 dark:border-slate-700 p-5 sm:p-6 shadow-[7px_7px_18px_rgba(65,82,125,0.12),-7px_-7px_18px_rgba(255,255,255,0.75)]">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-[#DCE5F7] text-[#202B50] dark:bg-sky-950 dark:text-sky-300 flex items-center justify-center text-xl">📢</div>
                 <div>
-                  <span className="block text-sm font-bold text-white">ประวัติการเดินทาง</span>
-                  <span className="text-[11px] text-emerald-100">ตรวจสอบตั๋วและประวัติจอง</span>
+                  <h3 className="font-bold text-slate-800 dark:text-white text-sm sm:text-base">ประกาศจากฝ่ายธุรการ</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">ข่าวสารและข้อมูลสำคัญ</p>
                 </div>
-              </button>
-
-              <button 
-                onClick={() => setActiveMenu('shiftRequest')}
-                className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white shadow-md transition-all active:scale-98 cursor-pointer text-left border border-amber-500"
-              >
-                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl shrink-0">
-                  🕒
-                </div>
-                <div>
-                  <span className="block text-sm font-bold text-white">ขอเปลี่ยนกะ / ออกก่อน</span>
-                  <span className="text-[11px] text-amber-100">แจ้งเปลี่ยนเวลากะกระทันหัน</span>
-                </div>
-              </button>
-
-              <button 
-                onClick={() => setActiveMenu('manual')}
-                className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-fuchsia-600 hover:bg-fuchsia-700 text-white shadow-md transition-all active:scale-98 cursor-pointer text-left border border-fuchsia-500"
-              >
-                <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-xl shrink-0">
-                  📖
-                </div>
-                <div>
-                  <span className="block text-sm font-bold text-white">คู่มือการใช้งาน</span>
-                  <span className="text-[11px] text-fuchsia-100">อ่านระเบียบและวิธีจองรถ</span>
-                </div>
-              </button>
+              </div>
+              <span className="text-xs font-bold text-[#202B50] dark:text-sky-300 bg-[#DCE5F7] dark:bg-sky-950 px-3 py-1.5 rounded-full">
+                {announcementsList.length} รายการ
+              </span>
             </div>
-          </div>
 
-          <div className="space-y-4">
-            <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
-              <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">ประกาศสำคัญจากฝ่ายธุรการ</h3>
-            </div>
             {announcementsList.length > 0 ? (
-              <div className="grid grid-cols-1 gap-4">
-                {announcementsList.map(a => (
-                  <div key={a.id} className="p-5 rounded-xl border bg-white dark:bg-slate-900 shadow-xs border-slate-200 dark:border-slate-800 space-y-2">
-                    <div className="flex justify-between items-start gap-4">
-                      <h4 className="font-bold text-sm text-slate-900 dark:text-white">{a.title}</h4>
-                      <span className="text-[11px] text-slate-500 font-medium bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-md border border-slate-200/60 dark:border-slate-700">
-                        {new Date(a.timestamp).toLocaleDateString('th-TH')}
-                      </span>
-                    </div>
-                    {a.desc && <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{a.desc}</p>}
-                  </div>
-                ))}
+              <div className="space-y-3">
+                {announcementsList.map((a: any) => {
+                  const parsedDate = a?.timestamp ? new Date(a.timestamp) : new Date();
+                  const safeDateObj = Number.isNaN(parsedDate.getTime()) ? new Date() : parsedDate;
+                  return (
+                    <article key={a.id} className="relative overflow-hidden p-4 sm:p-5 rounded-2xl bg-white/85 dark:bg-slate-950/85 border border-white/80 dark:border-slate-800">
+                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-[#202B50] dark:bg-sky-400" />
+                      <div className="pl-2">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                          <h4 className="font-bold text-sm text-slate-800 dark:text-white">{a.title}</h4>
+                          <span className="text-[11px] font-semibold text-[#202B50] dark:text-sky-300 bg-[#DCE5F7] dark:bg-sky-950 px-2.5 py-1 rounded-full shrink-0">
+                            📅 {formatThaiDate(formatDateToYMD(safeDateObj))}
+                          </span>
+                        </div>
+                        {a.desc && (
+                          <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed whitespace-pre-line mt-2">{a.desc}</p>
+                        )}
+                        <p className="text-[10px] text-[#202B50]/75 dark:text-sky-400 mt-3">ประกาศจากฝ่ายธุรการ</p>
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             ) : (
-              <div className="text-center py-12 border border-dashed rounded-xl text-slate-400 dark:text-slate-500 dark:border-slate-800 text-xs">ไม่มีประกาศใหม่ในขณะนี้</div>
+              <div className="py-10 text-center rounded-2xl border border-dashed border-[#B7C7E6] dark:border-slate-700 bg-white/60 dark:bg-slate-950/60">
+                <div className="w-12 h-12 mx-auto mb-2 rounded-2xl bg-[#DCE5F7] text-[#202B50] dark:bg-sky-950 dark:text-sky-300 flex items-center justify-center text-2xl">📨</div>
+                <p className="text-sm font-bold text-slate-700 dark:text-slate-300">ยังไม่มีประกาศใหม่</p>
+                <p className="text-xs text-slate-400 mt-1">หากมีข่าวสารจะแสดงที่นี่</p>
+              </div>
             )}
-          </div>
+          </section>
 
-          <div className="space-y-4 pt-4">
-            <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-2">
-              <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">กล่องข้อความช่วยเหลือของฉัน</h3>
-              <span className="text-[11px] text-slate-400">ทั้งหมด {myTickets.length} รายการ</span>
+          {/* Support Tickets */}
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-slate-800 dark:text-white text-base">กล่องข้อความช่วยเหลือของฉัน</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">ติดตามการติดต่อกับแอดมิน</p>
+              </div>
+              <span className="text-xs font-bold text-[#202B50] dark:text-sky-300 bg-[#DCE5F7] dark:bg-sky-950 px-3 py-1.5 rounded-full">
+                {myTickets.length} รายการ
+              </span>
             </div>
 
             {myTickets.length > 0 ? (
-              <div className="grid grid-cols-1 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {myTickets.map(tItem => {
                   const lastMsg = tItem.messages?.[tItem.messages.length - 1];
                   const isAdminReply = lastMsg?.sender === 'admin';
                   const isResolved = tItem.status === 'Resolved';
 
                   return (
-                    <div 
-                      key={tItem.id} 
-                      className={`p-4 rounded-xl border bg-white dark:bg-slate-900 shadow-xs transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 ${isAdminReply && !isResolved ? 'border-blue-500 ring-1 ring-blue-500/20 bg-blue-50/10' : 'border-slate-200 dark:border-slate-800'}`}
-                    >
-                      <div 
-                        onClick={() => setActiveChatTicketId(tItem.id)}
-                        className="space-y-1 flex-1 cursor-pointer"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900 dark:text-white text-xs">หัวข้อเรื่อง: {tItem.subject}</span>
-                          {isAdminReply && !isResolved && (
-                            <span className="bg-blue-600 text-white text-[10px] font-medium px-2 py-0.5 rounded-full">
-                              แอดมินตอบกลับแล้ว
-                            </span>
-                          )}
+                    <div key={tItem.id} className={`p-4 bg-[#EDF2FC] dark:bg-[#151E35] rounded-2xl border shadow-[7px_7px_18px_rgba(65,82,125,0.12),-7px_-7px_18px_rgba(255,255,255,0.75)] ${isAdminReply && !isResolved ? 'border-[#202B50]' : 'border-white/70 dark:border-slate-700'}`}>
+                      <div onClick={() => setActiveChatTicketId(tItem.id)} className="cursor-pointer">
+                        <div className="flex items-center justify-between gap-2">
+                          <h4 className="font-bold text-sm text-slate-800 dark:text-white truncate">{tItem.subject}</h4>
+                          {isAdminReply && !isResolved && <span className="text-[10px] bg-[#202B50] text-white px-2 py-1 rounded-full shrink-0">มีข้อความใหม่</span>}
                         </div>
-                        <p className="text-[11px] text-slate-500 truncate max-w-md">
+                        <p className="text-xs text-slate-500 mt-2 line-clamp-2">
                           {lastMsg ? `${lastMsg.sender === 'admin' ? 'Admin: ' : 'คุณ: '}${lastMsg.text}` : 'ไม่มีข้อความ'}
                         </p>
                       </div>
-
-                      <div className="flex items-center gap-3 self-end md:self-auto">
-                        <span className={`text-[10px] font-medium px-2.5 py-1 rounded-full ${isResolved ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900' : 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 border border-amber-200 dark:border-amber-900'}`}>
+                      <div className="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-[#C5D2EC] dark:border-slate-800">
+                        <span className={`text-[11px] px-2.5 py-1 rounded-full ${isResolved ? 'bg-[#DCE5F7] text-[#202B50] dark:bg-sky-950 dark:text-sky-300' : 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300'}`}>
                           {isResolved ? 'แก้ไขเรียบร้อย' : 'กำลังตรวจสอบ'}
                         </span>
-                        
-                        <button 
-                          onClick={() => setActiveChatTicketId(tItem.id)}
-                          className="text-xs font-semibold text-blue-600 hover:underline cursor-pointer"
-                        >
-                          เปิดแชท
-                        </button>
-
-                        {isResolved && (
-                          <button
-                            onClick={async () => {
-                              showAlert(
-                                'warning',
-                                'ยืนยันการลบ',
-                                'คุณแน่ใจหรือไม่ว่าต้องการลบเคสนี้?',
-                                async () => {
+                        <div className="flex items-center gap-3">
+                          <button onClick={() => setActiveChatTicketId(tItem.id)} className="text-xs font-bold text-[#202B50] dark:text-sky-300 hover:underline cursor-pointer">เปิดแชท</button>
+                          {isResolved && (
+                            <button
+                              onClick={() => {
+                                showAlert('warning', 'ยืนยันการลบ', 'คุณแน่ใจหรือไม่ว่าต้องการลบเคสนี้?', async () => {
                                   try {
                                     await deleteDoc(doc(db, 'support_tickets', tItem.id));
                                     showAlert('success', 'ลบสำเร็จ', 'ลบเคสเรียบร้อยแล้ว');
                                   } catch {
                                     showAlert('error', 'ข้อผิดพลาด', 'ไม่สามารถลบเคสได้');
                                   }
-                                },
-                                true
-                              );
-                            }}
-                            className="bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-900 text-[11px] font-medium px-2.5 py-1 rounded-lg transition-all cursor-pointer"
-                          >
-                            ลบ
-                          </button>
-                        )}
+                                }, true);
+                              }}
+                              className="text-xs font-semibold text-rose-600 bg-rose-50 dark:bg-rose-950/40 px-2.5 py-1 rounded-lg cursor-pointer"
+                            >
+                              ลบ
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <div className="p-6 text-center border border-dashed rounded-xl text-slate-400 dark:border-slate-800 text-xs">
+              <div className="p-6 text-center rounded-2xl border border-dashed border-[#B7C7E6] dark:border-slate-700 bg-[#EDF2FC]/80 dark:bg-[#151E35]/80 text-xs text-slate-500">
                 ยังไม่มีประวัติการแจ้งเรื่องหรือติดต่อแอดมิน
               </div>
             )}
-          </div>
+          </section>
 
-          <div className="space-y-4 pt-4">
-            <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
-              <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">ติดต่อ / แจ้งปัญหาถึงแอดมิน</h3>
+          {/* Contact Admin */}
+          <section className="bg-[#EDF2FC] dark:bg-[#151E35] rounded-3xl border border-white/70 dark:border-slate-700 p-5 sm:p-6 shadow-[7px_7px_18px_rgba(65,82,125,0.12),-7px_-7px_18px_rgba(255,255,255,0.75)]">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-11 h-11 rounded-2xl bg-[#DCE5F7] text-[#202B50] dark:bg-sky-950 dark:text-sky-300 flex items-center justify-center text-xl">💬</div>
+              <div>
+                <h3 className="font-bold text-slate-800 dark:text-white text-sm sm:text-base">ติดต่อ / แจ้งปัญหาถึงแอดมิน</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">เราพร้อมช่วยเหลือการใช้งานของคุณ</p>
+              </div>
             </div>
-            <form onSubmit={handleSendTicket} className="p-6 rounded-xl border bg-white dark:bg-slate-900 shadow-xs border-slate-200 dark:border-slate-800 space-y-4">
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-normal">พบปัญหาการใช้งาน แจ้งยกเลิกรอบรถ หรือติดต่อเจ้าหน้าที่ กรุณากรอกหัวข้อเพื่อเปิดเคสและเริ่มสนทนา</p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-1">
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">หัวข้อเรื่อง</label>
-                  <input 
-                    type="text" 
-                    placeholder="เช่น ลืมของบนรถสาย 1" 
-                    value={ticketSubject}
-                    onChange={(e) => setTicketSubject(e.target.value)}
-                    className="w-full border border-slate-200 dark:border-slate-800 dark:bg-slate-950 p-2.5 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
+
+            <form onSubmit={handleSendTicket} className="space-y-3">
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                พบปัญหาการใช้งาน แจ้งยกเลิกรอบรถ หรือต้องการติดต่อเจ้าหน้าที่ สามารถกรอกข้อมูลด้านล่างได้เลย
+              </p>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">หัวข้อเรื่อง</label>
+                <input
+                  type="text"
+                  placeholder="เช่น ลืมของบนรถสาย 1"
+                  value={ticketSubject}
+                  onChange={(e) => setTicketSubject(e.target.value)}
+                  className="w-full border border-white/80 dark:border-slate-700 bg-white/85 dark:bg-slate-950 p-3 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#202B50]/20"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-600 dark:text-slate-300 mb-1.5">รายละเอียด</label>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <input
+                    type="text"
+                    placeholder="อธิบายรายละเอียดปัญหาของคุณ..."
+                    value={ticketFirstMessage}
+                    onChange={(e) => setTicketFirstMessage(e.target.value)}
+                    className="flex-1 min-w-0 border border-white/80 dark:border-slate-700 bg-white/85 dark:bg-slate-950 p-3 rounded-xl text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[#202B50]/20"
                   />
-                </div>
-                <div className="md:col-span-2">
-                  <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">รายละเอียด</label>
-                  <div className="flex gap-2">
-                    <input 
-                      type="text" 
-                      placeholder="อธิบายรายละเอียดปัญหาของคุณ..." 
-                      value={ticketFirstMessage}
-                      onChange={(e) => setTicketFirstMessage(e.target.value)}
-                      className="w-full border border-slate-200 dark:border-slate-800 dark:bg-slate-950 p-2.5 rounded-xl text-slate-900 dark:text-white text-xs focus:outline-none focus:border-blue-500"
-                    />
-                    <button 
-                      type="submit" 
-                      disabled={isSubmittingTicket}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-5 rounded-xl text-xs font-medium whitespace-nowrap transition-all shadow-sm disabled:opacity-50 cursor-pointer"
-                    >
-                      {isSubmittingTicket ? 'กำลังเปิด...' : 'เริ่มแชท'}
-                    </button>
-                  </div>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingTicket}
+                    className="bg-[#202B50] text-white hover:brightness-110 px-6 py-3 rounded-xl text-sm font-bold transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    {isSubmittingTicket ? 'กำลังเปิด...' : 'เริ่มแชท →'}
+                  </button>
                 </div>
               </div>
             </form>
+          </section>
+
+          <div className="text-center py-3 text-[11px] text-slate-500 dark:text-slate-400">
+            AEROFLEX CO., LTD. · Employee Transport System
           </div>
         </div>
       )}
@@ -841,10 +922,146 @@ export default function UserView({
             </div>
           ) : (
             <div className="p-6 space-y-4">
+              {/* หน้า 1: ข้อมูลพนักงาน + ติ๊กเลือกวันที่จอง */}
               {bookingStep === 1 && (
                 <div className="space-y-4">
+                  <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
+                    <span className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">1.1 ข้อมูลพนักงาน</span>
+
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">รหัสพนักงาน</label>
+                        <input 
+                          type="text" 
+                          value={displayEmployeeCode} 
+                          readOnly 
+                          className="w-full border border-slate-300 dark:border-slate-700 bg-slate-200/60 dark:bg-slate-800 p-2.5 rounded-xl text-slate-700 dark:text-slate-200 font-mono font-bold text-xs cursor-not-allowed" 
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">ชื่อ - นามสกุล</label>
+                        <input 
+                          type="text" 
+                          placeholder="ชื่อ - นามสกุล" 
+                          value={employeeData?.name ? displayEmployeeName : employeeName} 
+                          onChange={(e) => setEmployeeName(e.target.value)} 
+                          readOnly={!!employeeData?.name} 
+                          className={`w-full border p-2.5 rounded-xl text-xs focus:outline-none focus:border-blue-500 transition-colors ${
+                            employeeData?.name 
+                              ? 'bg-slate-200/60 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 cursor-not-allowed' 
+                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white'
+                          }`} 
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">เบอร์โทรศัพท์ (สำหรับให้คนขับติดต่อ)</label>
+                      <input 
+                        type="tel" 
+                        placeholder="เช่น 0812345678" 
+                        value={employeePhone} 
+                        onChange={(e) => setEmployeePhone(e.target.value)} 
+                        className="w-full border border-slate-200 dark:border-slate-800 dark:bg-slate-900 p-2.5 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 text-xs" 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2.5 pt-1">
+                    <div className="flex justify-between items-center">
+                      <label className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">
+                        1.2 ติ๊กเลือกวันที่ที่จะจอง (เลือกได้หลายวัน)
+                      </label>
+                      <span className="text-[11px] font-bold text-blue-600 dark:text-blue-400">
+                        เลือกแล้ว {selectedDatesArray.length} วัน
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-56 overflow-y-auto pr-1">
+                      {upcomingDatesList.map((dStr) => {
+                        const isChecked = selectedDatesArray.includes(dStr);
+                        const { dayLabel, dateLabel } = formatShortThaiDateButton(dStr);
+
+                        return (
+                          <button
+                            key={dStr}
+                            type="button"
+                            onClick={() => toggleDateSelection(dStr)}
+                            className={`flex items-center justify-between p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                              isChecked
+                                ? 'bg-blue-600 border-blue-600 text-white shadow-sm ring-1 ring-blue-600'
+                                : 'bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:border-blue-400'
+                            }`}
+                          >
+                            <div>
+                              <span className={`block text-[10px] font-semibold ${isChecked ? 'text-blue-100' : 'text-slate-400'}`}>
+                                {dayLabel}
+                              </span>
+                              <span className="block text-xs font-bold">
+                                {dateLabel}
+                              </span>
+                            </div>
+                            <span className={`w-5 h-5 rounded-md flex items-center justify-center text-xs font-bold border ${
+                              isChecked
+                                ? 'bg-white text-blue-600 border-white'
+                                : 'bg-white dark:bg-slate-900 text-transparent border-slate-300 dark:border-slate-700'
+                            }`}>
+                              ✓
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {selectedDatesArray.length > 0 && (
+                      <div className="p-3 bg-blue-50/60 dark:bg-blue-950/20 rounded-xl border border-blue-200/70 dark:border-blue-900/50 space-y-1.5">
+                        <span className="text-[11px] font-semibold text-blue-700 dark:text-blue-300 block">วันที่ที่เลือกไว้:</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedDatesArray.map((d) => (
+                            <span
+                              key={d}
+                              onClick={() => toggleDateSelection(d)}
+                              className="bg-white dark:bg-slate-900 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 text-[11px] font-mono font-semibold px-2 py-0.5 rounded-lg flex items-center gap-1 cursor-pointer hover:border-rose-400"
+                            >
+                              {formatThaiDate(d)}
+                              <span className="text-rose-500 font-bold">×</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  <button 
+                    disabled={!isSystemOpen}
+                    onClick={() => {
+                      if (!checkIsBookingOpen()) {
+                        showAlert('error', 'ระบบปิด', closeReasonMessage);
+                        return;
+                      }
+                      const currentNameVal = (employeeData?.name ? displayEmployeeName : employeeName).trim();
+                      if (!currentNameVal) {
+                        showAlert('warning', 'ข้อมูลไม่ครบถ้วน', 'กรุณากรอกชื่อ - นามสกุลพนักงาน');
+                        return;
+                      }
+                      if (selectedDatesArray.length === 0) {
+                        showAlert('warning', 'ยังไม่ได้เลือกวัน', 'กรุณาติ๊กเลือกวันที่ต้องการเดินทางอย่างน้อย 1 วัน');
+                        return;
+                      }
+                      setBookingStep(2);
+                    }} 
+                    className="w-full bg-slate-900 hover:bg-black dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-medium py-2.5 rounded-xl text-center mt-2 cursor-pointer text-xs transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    ถัดไป →
+                  </button>
+                </div>
+              )}
+
+              {/* หน้า 2: เลือกกะ + เลือกสายรถ + เลือกจุดขึ้นรถ + ตรวจสอบข้อมูล */}
+              {bookingStep === 2 && (
+                <div className="space-y-4">
                   <div className="space-y-3">
-                    <label className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">1.1 เลือกกะและช่วงเวลาทำงาน</label>
+                    <label className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">2.1 เลือกกะและช่วงเวลาทำงาน</label>
                     
                     <div className="grid grid-cols-2 gap-2">
                       <button 
@@ -871,7 +1088,7 @@ export default function UserView({
 
                     {shiftType === 'Day' ? (
                       <div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800">
-                        <p className="text-[11px] font-semibold text-slate-500 mb-1">กะ Day:</p>
+                        <p className="text-[11px] font-semibold text-slate-500 mb-1">ช่วงเวลากะ Day:</p>
                         <div className="text-xs font-semibold bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200">
                           เข้างาน 08:00 น. / เลิกงาน 17:00 น.
                         </div>
@@ -906,7 +1123,7 @@ export default function UserView({
                   <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
                     <div className="flex justify-between items-center">
                       <label className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">
-                        1.2 เลือกสายรถตู้สวัสดิการ {shiftType === 'Shift' ? `(${shiftTimeSlot})` : ''}
+                        2.2 เลือกสายรถตู้สวัสดิการ {shiftType === 'Shift' ? `(${shiftTimeSlot})` : ''}
                       </label>
                       <span className="text-[10px] text-slate-400">{filteredRoutesList.length} รายการ</span>
                     </div>
@@ -941,190 +1158,24 @@ export default function UserView({
                     </div>
                   </div>
 
-                  <div className="space-y-2.5 pt-2 border-t border-slate-200 dark:border-slate-800">
-                    <label className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">1.3 เลือกประเภทการเดินทาง</label>
-                    
-                    <div className="grid grid-cols-1 gap-2">
-                      <label className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border text-xs font-semibold cursor-pointer transition-all backdrop-blur-md ${
-                        tripType === 'roundTrip' 
-                          ? 'bg-blue-600/90 hover:bg-blue-600 text-white border-blue-600 shadow-sm' 
-                          : 'bg-white/60 dark:bg-slate-950/60 border-slate-200/80 dark:border-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900/60'
-                      }`}>
-                        <input 
-                          type="radio" 
-                          name="tripType" 
-                          checked={tripType === 'roundTrip'} 
-                          onChange={() => setTripType('roundTrip')} 
-                          className="accent-blue-600 dark:accent-blue-500 w-4 h-4 cursor-pointer"
-                        />
-                        <span>ไป-กลับ (ทั้งขามาและขากลับ)</span>
-                      </label>
-
-                      <label className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border text-xs font-semibold cursor-pointer transition-all backdrop-blur-md ${
-                        tripType === 'inboundOnly' 
-                          ? 'bg-blue-600/90 hover:bg-blue-600 text-white border-blue-600 shadow-sm' 
-                          : 'bg-white/60 dark:bg-slate-950/60 border-slate-200/80 dark:border-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900/60'
-                      }`}>
-                        <input 
-                          type="radio" 
-                          name="tripType" 
-                          checked={tripType === 'inboundOnly'} 
-                          onChange={() => setTripType('inboundOnly')} 
-                          className="accent-blue-600 dark:accent-blue-500 w-4 h-4 cursor-pointer"
-                        />
-                        <span>เฉพาะขามา (ขาไปอย่างเดียว)</span>
-                      </label>
-
-                      <label className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border text-xs font-semibold cursor-pointer transition-all backdrop-blur-md ${
-                        tripType === 'outboundOnly' 
-                          ? 'bg-blue-600/90 hover:bg-blue-600 text-white border-blue-600 shadow-sm' 
-                          : 'bg-white/60 dark:bg-slate-950/60 border-slate-200/80 dark:border-slate-800/80 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900/60'
-                      }`}>
-                        <input 
-                          type="radio" 
-                          name="tripType" 
-                          checked={tripType === 'outboundOnly'} 
-                          onChange={() => setTripType('outboundOnly')} 
-                          className="accent-blue-600 dark:accent-blue-500 w-4 h-4 cursor-pointer"
-                        />
-                        <span>เฉพาะขากลับอย่างเดียว</span>
-                      </label>
-                    </div>
-                  </div>
-
-                  <button 
-                    disabled={!isSystemOpen}
-                    onClick={() => {
-                      if (!checkIsBookingOpen()) {
-                        showAlert('error', 'ระบบปิด', closeReasonMessage);
-                        return;
-                      }
-                      if (filteredRoutesList.length === 0 || !selectedRouteId) {
-                        showAlert('warning', 'คำเตือน', 'กรุณาเลือกกะและช่วงเวลาที่มีสายรถเปิดให้บริการ');
-                        return;
-                      }
-                      setBookingStep(2);
-                    }} 
-                    className="w-full bg-slate-900 hover:bg-black dark:bg-slate-800 dark:hover:bg-slate-700 text-white font-medium py-2.5 rounded-xl text-center mt-2 cursor-pointer text-xs transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    ขั้นตอนถัดไป (กรอกข้อมูลส่วนตัว & จุดขึ้นรถ) →
-                  </button>
-                </div>
-              )}
-
-              {bookingStep === 2 && (
-                <div className="space-y-4">
-                  <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3">
-                    <span className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">ข้อมูลติดต่อสำหรับคนขับ</span>
-                    
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">ชื่อ - นามสกุล พนักงาน</label>
-                      <input 
-                        type="text" 
-                        placeholder="ชื่อ - นามสกุล" 
-                        value={employeeName} 
-                        onChange={(e) => setEmployeeName(e.target.value)} 
-                        readOnly={!!employeeData?.name} 
-                        className={`w-full border p-2.5 rounded-xl text-xs focus:outline-none focus:border-blue-500 transition-colors ${
-                          employeeData?.name 
-                            ? 'bg-slate-200/60 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 cursor-not-allowed' 
-                            : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white'
-                        }`} 
-                      />
-                    </div>
-
-                    {displayDepartment && (
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">แผนก / องค์กร</label>
-                        <input 
-                          type="text" 
-                          value={displayDepartment} 
-                          readOnly 
-                          className="w-full border border-slate-300 dark:border-slate-700 bg-slate-200/60 dark:bg-slate-800 p-2.5 rounded-xl text-slate-600 dark:text-slate-300 text-xs cursor-not-allowed" 
-                        />
-                      </div>
-                    )}
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-600 dark:text-slate-400 mb-1">เบอร์โทรศัพท์ (สำหรับให้คนขับติดต่อ)</label>
-                      <input 
-                        type="tel" 
-                        placeholder="เช่น 0812345678" 
-                        value={employeePhone} 
-                        onChange={(e) => setEmployeePhone(e.target.value)} 
-                        className="w-full border border-slate-200 dark:border-slate-800 dark:bg-slate-900 p-2.5 rounded-xl text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 text-xs" 
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider mb-1.5">สถานีจุดจอดรับและตารางเวลา</label>
+                  <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
+                    <label className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">2.3 เลือกจุดขึ้นรถ</label>
                     <select 
                       value={selectedStationIndex} 
                       onChange={(e) => setSelectedStationIndex(Number(e.target.value))} 
                       className="w-full border border-slate-200 dark:border-slate-800 dark:bg-slate-950 p-2.5 rounded-xl text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 text-xs cursor-pointer"
                     >
-                      {activeStations.map((st: any, i: number) => (
-                        <option key={i} value={i} className="dark:bg-slate-950">
-                          จุดที่ #{st.index}: {st.name} ({st.time})
-                        </option>
-                      ))}
+                      {activeStations.length > 0 ? (
+                        activeStations.map((st: any, i: number) => (
+                          <option key={i} value={i} className="dark:bg-slate-950">
+                            จุดที่ #{st.index}: {st.name} ({st.time})
+                          </option>
+                        ))
+                      ) : (
+                        <option value={0}>ไม่พบจุดขึ้นรถในสายนี้</option>
+                      )}
                     </select>
                   </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider mb-1.5">ระบุวันที่ต้องการจอง (เลือกได้หลายวัน)</label>
-                    <div className="flex gap-2">
-                      <input 
-                        type="date" 
-                        id="multiDateInput"
-                        min={getTodayDateString()}
-                        className="w-full border border-slate-200 dark:border-slate-800 dark:bg-slate-950 p-2.5 rounded-xl text-slate-900 dark:text-white font-medium focus:outline-none focus:border-blue-500 text-xs cursor-pointer" 
-                      />
-                      <button 
-                        type="button"
-                        onClick={() => {
-                          const inputEl = document.getElementById('multiDateInput') as HTMLInputElement;
-                          if (inputEl && inputEl.value) {
-                            const val = inputEl.value;
-                            const currentList = travelDate ? travelDate.split(',').map((d: string) => d.trim()).filter(Boolean) : [];
-                            if (!currentList.includes(val)) {
-                              currentList.push(val);
-                              currentList.sort();
-                              setTravelDate(currentList.join(','));
-                            }
-                            inputEl.value = '';
-                          }
-                        }}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 rounded-xl text-xs font-medium whitespace-nowrap cursor-pointer transition-all"
-                      >
-                        เพิ่มวัน
-                      </button>
-                    </div>
-                  </div>
-
-                  {travelDate && (
-                    <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 space-y-2">
-                      <span className="text-[11px] font-semibold text-slate-500 block">วันที่เลือกไว้แล้ว:</span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {travelDate.split(',').map((d: string, idx: number) => (
-                          <span key={idx} className="bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 text-[11px] font-medium px-2.5 py-1 rounded-lg flex items-center gap-1.5">
-                            {formatThaiDate(d.trim())}
-                            <button 
-                              type="button"
-                              onClick={() => {
-                                const list = travelDate.split(',').map((item: string) => item.trim()).filter((item: string) => item !== d.trim());
-                                setTravelDate(list.join(','));
-                              }}
-                              className="text-rose-500 hover:text-rose-700 font-bold cursor-pointer"
-                            >
-                              ×
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
 
                   <div className="flex gap-2 pt-2">
                     <button 
@@ -1135,12 +1186,8 @@ export default function UserView({
                     </button>
                     <button 
                       onClick={() => {
-                        if (!employeeName.trim() && !displayEmployeeName) {
-                          showAlert('warning', 'ข้อมูลไม่ครบถ้วน', 'กรุณากรอกชื่อและเบอร์โทรศัพท์พนักงาน');
-                          return;
-                        }
-                        if (!travelDate) {
-                          showAlert('warning', 'ยังไม่ได้เลือกวัน', 'กรุณาเลือกวันที่ต้องการเดินทางอย่างน้อย 1 วัน');
+                        if (filteredRoutesList.length === 0 || !selectedRouteId) {
+                          showAlert('warning', 'คำเตือน', 'กรุณาเลือกกะและช่วงเวลาที่มีสายรถเปิดให้บริการ');
                           return;
                         }
                         setBookingStep(3);
@@ -1153,25 +1200,26 @@ export default function UserView({
                 </div>
               )}
 
+              {/* หน้า 3: แสดงรายละเอียดทั้งหมด แล้วกดยืนยันเลย */}
               {bookingStep === 3 && (
                 <div className="space-y-4">
                   <div className="p-4 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3 text-xs">
-                    <span className="block font-bold uppercase text-slate-500 tracking-wider mb-2">สรุปข้อมูลการสำรองที่นั่ง</span>
+                    <span className="block font-bold uppercase text-slate-500 tracking-wider mb-2">สรุปรายละเอียดการสำรองที่นั่ง</span>
                     <div className="space-y-1.5 text-slate-600 dark:text-slate-300">
-                      <p><strong>กะทำงาน:</strong> {shiftType === 'Day' ? 'กะ Day' : 'กะ Shift'} ({shiftTimeSlot})</p>
-                      <p><strong>ประเภทการเดินทาง:</strong> {tripType === 'roundTrip' ? 'ไป-กลับ' : tripType === 'inboundOnly' ? 'เฉพาะขามา' : 'เฉพาะขากลับ'}</p>
-                      <p><strong>สายรถ:</strong> {selectedRouteName}</p>
-                      <p><strong>ชื่อผู้เดินทาง:</strong> {displayEmployeeName} ({displayDepartment})</p>
+                      <p><strong>รหัสพนักงาน:</strong> <span className="font-mono">{displayEmployeeCode}</span></p>
+                      <p><strong>ชื่อผู้เดินทาง:</strong> {employeeData?.name ? displayEmployeeName : employeeName} ({displayDepartment})</p>
                       <p><strong>เบอร์โทรศัพท์:</strong> {employeePhone || '-'}</p>
-                      <p><strong>จุดรับ-ส่ง:</strong> จุดที่ #{activeStations[selectedStationIndex]?.index}: {activeStations[selectedStationIndex]?.name} ({activeStations[selectedStationIndex]?.time})</p>
+                      <p><strong>กะทำงาน:</strong> {shiftType === 'Day' ? 'กะ Day' : 'กะ Shift'} ({shiftTimeSlot})</p>
+                      <p><strong>สายรถ:</strong> {selectedRouteName || '-'}</p>
+                      <p><strong>จุดขึ้นรถ:</strong> {activeStations[selectedStationIndex] ? `จุดที่ #${activeStations[selectedStationIndex].index}: ${activeStations[selectedStationIndex].name} (${activeStations[selectedStationIndex].time})` : '-'}</p>
                     </div>
                     
                     <div className="pt-2 border-t border-slate-200 dark:border-slate-800 space-y-1.5">
-                      <strong className="block text-slate-700 dark:text-slate-300">วันที่เดินทางที่เลือก:</strong>
+                      <strong className="block text-slate-700 dark:text-slate-300">วันที่เดินทางที่เลือก ({selectedDatesArray.length} วัน):</strong>
                       <div className="grid grid-cols-2 gap-1.5 max-h-32 overflow-y-auto pr-1">
-                        {travelDate.split(',').map((d: string, idx: number) => (
+                        {selectedDatesArray.map((d: string, idx: number) => (
                           <div key={idx} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-2.5 py-1.5 rounded-lg text-center font-mono font-medium text-blue-600 dark:text-blue-400">
-                            {formatThaiDate(d.trim())}
+                            {formatThaiDate(d)}
                           </div>
                         ))}
                       </div>
@@ -1183,7 +1231,7 @@ export default function UserView({
                       onClick={() => setBookingStep(2)} 
                       className="w-1/3 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium py-2.5 rounded-xl text-xs cursor-pointer"
                     >
-                      แก้ไข
+                      ย้อนกลับ
                     </button>
                     <button 
                       disabled={isBookingLoading || !isSystemOpen} 
@@ -1194,27 +1242,27 @@ export default function UserView({
                         }
 
                         const currentActiveRoute = filteredRoutesList.find(r => r.id === selectedRouteId) || filteredRoutesList[0] || routesList[0];
-                        if (!currentActiveRoute || !travelDate) {
-                          showAlert('warning', 'ข้อมูลไม่ครบถ้วน', 'กรุณากรอกข้อมูลที่จำเป็นให้ครบถ้วน');
+                        if (!currentActiveRoute || selectedDatesArray.length === 0) {
+                          showAlert('warning', 'ข้อมูลไม่ครบถ้วน', 'กรุณาตรวจสอบข้อมูลและวันที่เดินทางให้ครบถ้วน');
                           return;
                         }
 
-                        const datesArray = travelDate.split(',').map((d: string) => d.trim()).filter(Boolean);
                         const stationsList = getRouteStations(currentActiveRoute);
                         const targetStation = stationsList[selectedStationIndex];
                         const currentEmployeeEmail = user?.email || 'employee@company.com';
-                        const finalEmpName = displayEmployeeName;
+                        const finalEmpName = employeeData?.name ? displayEmployeeName : employeeName.trim();
 
                         setIsBookingLoading(true);
                         try {
                           let lastDocRef: any = null;
-                          for (const d of datesArray) {
+                          for (const d of selectedDatesArray) {
                             const { adjustedDate } = checkCutoffTimeAndAdjustDate(d);
                             const bookingData = {
-                              employeeEmail: currentEmployeeEmail, 
+                              employeeEmail: currentEmployeeEmail,
+                              employeeCode: displayEmployeeCode,
                               employeeName: finalEmpName, 
                               employeePhone: employeePhone || '-',
-                              route: selectedRouteName, 
+                              route: currentActiveRoute.name || selectedRouteName, 
                               pickupLocation: `จุดที่ ${targetStation?.index || 1}: ${targetStation?.name || 'ไม่ระบุ'}`, 
                               time: targetStation?.time || 'ไม่ระบุ',
                               driverName: currentActiveRoute.driver || currentActiveRoute.driverName || 'ไม่ระบุ', 
@@ -1236,7 +1284,7 @@ export default function UserView({
                               employeeEmail: currentEmployeeEmail, 
                               employeeName: finalEmpName, 
                               employeePhone: employeePhone || '-', 
-                              route: selectedRouteName, 
+                              route: currentActiveRoute.name || selectedRouteName, 
                               travelDate, 
                               shiftType, 
                               shiftTimeSlot, 
@@ -1252,6 +1300,7 @@ export default function UserView({
                             () => {
                               setActiveMenu('history');
                               setBookingStep(1);
+                              setTravelDate('');
                             }
                           );
                         } catch {
@@ -1262,7 +1311,7 @@ export default function UserView({
                       }} 
                       className="w-2/3 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-xl text-xs shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all"
                     >
-                      {isBookingLoading ? 'กำลังบันทึก...' : 'ยืนยันสำรองสิทธิ์'}
+                      {isBookingLoading ? 'กำลังบันทึก...' : 'ยืนยัน'}
                     </button>
                   </div>
                 </div>
@@ -1391,70 +1440,237 @@ export default function UserView({
         </div>
       )}
 
-      {/* 4. HISTORY TAB */}
+      {/* 4. HISTORY TAB - MODERN NEUMORPHIC DESIGN */}
       {activeMenu === 'history' && (
-        <div className="max-w-3xl mx-auto space-y-6">
-          <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-800 pb-2">
-            <h3 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">ประวัติการจอง</h3>
-            <span className="text-[11px] text-slate-400">ทั้งหมด {myBookings.length} รายการ</span>
+        <div className="max-w-5xl mx-auto space-y-6 text-[#182342] dark:text-slate-100">
+
+          {/* Header */}
+          <div className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-[#202B50] via-[#17213F] to-[#0B1020] p-6 sm:p-8 text-white shadow-[8px_10px_25px_rgba(17,26,56,0.18)]">
+            <div className="absolute -right-12 -top-16 w-56 h-56 rounded-full bg-white/[0.05]" />
+            <div className="absolute right-28 -bottom-24 w-48 h-48 rounded-full bg-white/[0.05]" />
+
+            <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 border border-white/10 text-[10px] tracking-wider font-semibold text-slate-300">
+                  ✦ TRANSPORT HISTORY
+                </span>
+                <h2 className="text-xl sm:text-2xl font-bold mt-3">
+                  ประวัติการจองของฉัน
+                </h2>
+                <p className="text-xs text-slate-300 mt-2">
+                  ตรวจสอบวันเดินทาง สายรถ และรายละเอียดการจองย้อนหลัง
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 bg-white/10 border border-white/10 rounded-2xl px-4 py-3">
+                <div className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center text-2xl">
+                  📋
+                </div>
+                <div>
+                  <p className="text-[10px] text-slate-300">รายการจองทั้งหมด</p>
+                  <p className="text-2xl font-bold">{myBookings.length}</p>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-            <div>
-              <label className="block font-semibold text-slate-500 mb-1">กรองตามวันที่เดินทาง</label>
-              <input 
-                type="date"
-                value={historyFilterDate}
-                onChange={(e) => setHistoryFilterDate(e.target.value)}
-                className="w-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-2 rounded-lg font-medium text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer"
-              />
-            </div>
-            <div>
-              <label className="block font-semibold text-slate-500 mb-1">กรองตามสายรถ</label>
-              <select
-                value={historyFilterRoute}
-                onChange={(e) => setHistoryFilterRoute(e.target.value)}
-                className="w-full border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-2.5 rounded-lg font-medium text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 cursor-pointer"
-              >
-                <option value="">ทุกสายรถ</option>
-                {routesList.map((r: any) => (
-                  <option key={r.id} value={r.name}>{r.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
+          {/* Filter */}
+          <section className="bg-[#EDF2FC] dark:bg-[#151E35] rounded-[26px] p-5 sm:p-6 border border-white/70 dark:border-slate-700 shadow-[6px_7px_18px_rgba(65,82,125,0.10)]">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <div>
+                <h3 className="font-bold text-sm text-[#202B50] dark:text-white">
+                  🔎 ค้นหารายการจอง
+                </h3>
+                <p className="text-[11px] text-[#8493B3] mt-1">
+                  เลือกวันที่หรือสายรถเพื่อค้นหารายการที่ต้องการ
+                </p>
+              </div>
 
-          <div className="space-y-3">
+              {(historyFilterDate || historyFilterRoute) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHistoryFilterDate('');
+                    setHistoryFilterRoute('');
+                  }}
+                  className="text-xs font-semibold text-[#52658F] dark:text-slate-300 hover:text-[#111A38] dark:hover:text-white px-3 py-2 rounded-xl bg-white/70 dark:bg-slate-800 border border-white dark:border-slate-700 cursor-pointer"
+                >
+                  ↻ ล้างตัวกรอง
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-[#52658F] dark:text-slate-300 mb-2">
+                  📅 วันที่เดินทาง
+                </label>
+                <input
+                  type="date"
+                  value={historyFilterDate}
+                  onChange={(e) => setHistoryFilterDate(e.target.value)}
+                  className="w-full bg-white dark:bg-[#0E172B] border border-[#DCE4F3] dark:border-slate-700 rounded-xl px-4 py-3 text-sm text-[#202B50] dark:text-white outline-none focus:ring-2 focus:ring-[#8499C5]/40 transition-all cursor-pointer"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[#52658F] dark:text-slate-300 mb-2">
+                  🚐 สายรถ
+                </label>
+                <select
+                  value={historyFilterRoute}
+                  onChange={(e) => setHistoryFilterRoute(e.target.value)}
+                  className="w-full bg-white dark:bg-[#0E172B] border border-[#DCE4F3] dark:border-slate-700 rounded-xl px-4 py-3 text-sm text-[#202B50] dark:text-white outline-none focus:ring-2 focus:ring-[#8499C5]/40 transition-all cursor-pointer"
+                >
+                  <option value="">ทุกสายรถ</option>
+                  {routesList.map((r: any) => (
+                    <option key={r.id} value={r.name}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between border-t border-[#DCE4F3] dark:border-slate-700 pt-3">
+              <span className="text-xs text-[#8493B3] dark:text-slate-400">
+                ผลการค้นหา
+              </span>
+              <span className="text-xs font-bold text-[#202B50] dark:text-white bg-white dark:bg-slate-800 px-3 py-1.5 rounded-lg">
+                {filteredHistory.length} รายการ
+              </span>
+            </div>
+          </section>
+
+          {/* Booking List */}
+          <section className="space-y-3">
+            <div className="flex items-center justify-between px-1">
+              <h3 className="text-sm font-bold text-[#202B50] dark:text-white">
+                รายการเดินทาง
+              </h3>
+              <span className="text-[10px] text-[#8493B3] dark:text-slate-400">
+                BOOKING RECORDS
+              </span>
+            </div>
+
             {filteredHistory.length > 0 ? (
               filteredHistory.map((b: any, idx: number) => (
-                <div key={idx} className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-slate-900 dark:text-white text-xs">{b.route}</span>
-                      <span className="text-[10px] bg-purple-50 dark:bg-purple-950/40 text-purple-600 px-2 py-0.5 rounded font-medium">
-                        กะ: {b.shiftType}{b.shiftType === 'Shift' && b.shiftTimeSlot ? ` (${b.shiftTimeSlot})` : ''}
-                      </span>
-                      <span className="text-[10px] bg-blue-50 dark:bg-blue-950/40 text-blue-600 px-2 py-0.5 rounded font-medium">
-                        {b.tripType === 'inboundOnly' ? 'เฉพาะขามา' : b.tripType === 'outboundOnly' ? 'เฉพาะขากลับ' : 'ไป-กลับ'}
-                      </span>
+                <article
+                  key={b.id || idx}
+                  className="group bg-white dark:bg-[#151E35] rounded-[24px] border border-[#E2E9F6] dark:border-slate-700 shadow-[5px_6px_16px_rgba(65,82,125,0.08)] hover:shadow-[7px_9px_22px_rgba(65,82,125,0.13)] transition-all overflow-hidden"
+                >
+                  <div className="flex flex-col sm:flex-row">
+                    {/* Date */}
+                    <div className="sm:w-32 shrink-0 bg-[#E8EEF9] dark:bg-[#202B50] p-4 flex sm:flex-col items-center justify-center gap-2 sm:gap-1 text-center">
+                      <span className="text-2xl">📅</span>
+                      <div>
+                        <p className="text-[10px] text-[#8493B3] dark:text-slate-300">
+                          วันเดินทาง
+                        </p>
+                        <p className="text-sm font-bold text-[#202B50] dark:text-white mt-1">
+                          {formatThaiDate(b.travelDate)}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">จุดขึ้นรถ: {b.pickupLocation} ({b.time}) | ทะเบียน: {b.vanPlate}</p>
-                    <p className="text-[11px] text-slate-400 font-mono">วันที่: {formatThaiDate(b.travelDate)}</p>
+
+                    {/* Details */}
+                    <div className="flex-1 min-w-0 p-4 sm:p-5">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h4 className="font-bold text-base text-[#202B50] dark:text-white">
+                          {b.route || 'ไม่ระบุสายรถ'}
+                        </h4>
+
+                        <span className="inline-flex items-center gap-1.5 text-[10px] font-bold px-3 py-1.5 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-100 dark:border-emerald-900">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          ยืนยันแล้ว
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 mt-3">
+                        <span className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-[#E8EEF9] dark:bg-[#202B50] text-[#52658F] dark:text-slate-200">
+                          🕒 กะ {b.shiftType || '-'}
+                          {b.shiftType === 'Shift' && b.shiftTimeSlot
+                            ? ` (${b.shiftTimeSlot})`
+                            : ''}
+                        </span>
+
+                        <span className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-[#E8EEF9] dark:bg-[#202B50] text-[#52658F] dark:text-slate-200">
+                          {b.tripType === 'inboundOnly'
+                            ? '↗ เฉพาะขามา'
+                            : b.tripType === 'outboundOnly'
+                              ? '↙ เฉพาะขากลับ'
+                              : '↔ ไป-กลับ'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 pt-3 border-t border-[#EDF1F8] dark:border-slate-700">
+                        <div className="flex items-start gap-2">
+                          <span className="text-base">📍</span>
+                          <div className="min-w-0">
+                            <p className="text-[10px] text-[#8493B3] dark:text-slate-400">
+                              จุดขึ้นรถ
+                            </p>
+                            <p className="text-xs font-medium text-[#344365] dark:text-slate-200 mt-0.5 break-words">
+                              {b.pickupLocation || 'ไม่ระบุ'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-start gap-2">
+                          <span className="text-base">🕒</span>
+                          <div>
+                            <p className="text-[10px] text-[#8493B3] dark:text-slate-400">
+                              เวลารับ
+                            </p>
+                            <p className="text-xs font-medium text-[#344365] dark:text-slate-200 mt-0.5">
+                              {b.time || 'ไม่ระบุ'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-start gap-2 sm:col-span-2">
+                          <span className="text-base">🚐</span>
+                          <div>
+                            <p className="text-[10px] text-[#8493B3] dark:text-slate-400">
+                              ทะเบียนรถ
+                            </p>
+                            <p className="text-xs font-semibold text-[#344365] dark:text-slate-200 mt-0.5">
+                              {b.vanPlate || 'ไม่ระบุ'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  
-                  <div className="flex items-center gap-2 self-start md:self-auto">
-                    <span className="text-[10px] font-medium px-2.5 py-1.5 rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900">
-                      ยืนยันแล้ว
-                    </span>
-                  </div>
-                </div>
+                </article>
               ))
             ) : (
-              <div className="text-center py-12 border border-dashed rounded-xl text-slate-400 dark:text-slate-500 dark:border-slate-800 text-xs">
-                ไม่พบประวัติการจองตามเงื่อนไขที่เลือก
+              <div className="bg-white dark:bg-[#151E35] rounded-[24px] border border-dashed border-[#C7D3E9] dark:border-slate-700 py-14 px-5 text-center">
+                <div className="w-16 h-16 mx-auto rounded-2xl bg-[#E8EEF9] dark:bg-[#202B50] flex items-center justify-center text-3xl mb-4">
+                  📭
+                </div>
+                <h4 className="font-bold text-sm text-[#344365] dark:text-white">
+                  ไม่พบประวัติการจอง
+                </h4>
+                <p className="text-xs text-[#8493B3] dark:text-slate-400 mt-2">
+                  ลองเปลี่ยนวันที่หรือเลือกทุกสายรถเพื่อดูรายการอื่น
+                </p>
               </div>
             )}
-          </div>
+          </section>
+
+          {/* Back to booking */}
+          <button
+            type="button"
+            onClick={() => {
+              setBookingStep(1);
+              setActiveMenu('booking');
+            }}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gradient-to-r from-[#202B50] to-[#111A38] hover:brightness-110 text-white px-6 py-3.5 rounded-2xl text-sm font-bold shadow-[5px_7px_16px_rgba(17,26,56,0.20)] transition-all cursor-pointer"
+          >
+            🚐 จองรถตู้เพิ่มเติม
+            <span>→</span>
+          </button>
         </div>
       )}
 
@@ -1488,10 +1704,9 @@ export default function UserView({
                 </div>
                 <ol className="text-xs text-slate-600 dark:text-slate-300 space-y-2.5 list-decimal pl-5">
                   <li>ไปที่เมนู <strong>ลงทะเบียนจองคิวรถตู้</strong></li>
-                  <li>เลือก <strong>กะการทำงาน</strong> (Day หรือ Shift) และเลือก <strong>สายรถ</strong> ที่ต้องการเดินทาง</li>
-                  <li>เลือกประเภทการเดินทาง (ไป-กลับ, เฉพาะขามา, เฉพาะขากลับ)</li>
-                  <li>กรอกชื่อ-นามสกุล เบอร์โทรศัพท์ และเลือก <strong>สถานี/จุดรับส่ง</strong> พร้อมวันที่เดินทาง</li>
-                  <li>ตรวจสอบข้อมูลในขั้นตอนสุดท้าย และกดปุ่ม <strong>ยืนยันสำรองสิทธิ์</strong></li>
+                  <li>กรอกข้อมูลส่วนตัวและ <strong>ติ๊กเลือกวันที่ต้องการจอง</strong> แล้วกดถัดไป</li>
+                  <li>เลือก <strong>กะการทำงาน</strong> (Day หรือ Shift) เลือก <strong>สายรถ</strong> และเลือก <strong>จุดขึ้นรถ</strong></li>
+                  <li>กด <strong>ตรวจสอบข้อมูล</strong> และกด <strong>ยืนยัน</strong></li>
                 </ol>
               </div>
 
@@ -1545,10 +1760,9 @@ export default function UserView({
                   </div>
                   <ol className="text-xs text-slate-600 dark:text-slate-300 space-y-2 list-decimal pl-4 leading-relaxed">
                     <li>ไปที่เมนู <strong>ลงทะเบียนจองคิวรถตู้</strong></li>
-                    <li>เลือก <strong>กะการทำงาน</strong> และเลือก <strong>สายรถ</strong> ที่ต้องการ</li>
-                    <li>เลือกประเภทการเดินทาง (ไป-กลับ, ขามา, ขากลับ)</li>
-                    <li>กรอกข้อมูลและเลือก <strong>สถานี/จุดรับส่ง</strong> พร้อมวันที่เดินทาง</li>
-                    <li>ตรวจสอบข้อมูลและกด <strong>ยืนยันสำรองสิทธิ์</strong></li>
+                    <li>กรอกข้อมูลและ <strong>ติ๊กเลือกวันที่ต้องการจอง</strong> แล้วกดถัดไป</li>
+                    <li>เลือก <strong>กะการทำงาน</strong> เลือก <strong>สายรถ</strong> และเลือก <strong>จุดขึ้นรถ</strong></li>
+                    <li>กด <strong>ตรวจสอบข้อมูล</strong> และกด <strong>ยืนยัน</strong></li>
                   </ol>
                 </div>
 
