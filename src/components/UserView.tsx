@@ -113,11 +113,10 @@ export default function UserView({
     };
   }, [db]);
 
-  // 🟢 ดึงข้อมูลพนักงานจาก Firestore อัตโนมัติ (แปลงเป็นตัวพิมพ์ใหญ่เสมอเพื่อแก้ปัญหาหาไม่เจอและไม่ติด Permission Denied)
+  // 🟢 ดึงข้อมูลพนักงานจาก Firestore อัตโนมัติ
   useEffect(() => {
     if (!db || !user) return;
     
-    // ดึงรหัสจาก email เช่น 01a01@mail.com -> 01a01 แล้วแปลงเป็นพิมพ์ใหญ่ (01A01)
     const empId = user?.email ? user.email.split('@')[0].toUpperCase() : (user?.uid || '01A01');
     
     const unsubEmp = onSnapshot(doc(db, 'employees', empId), (docSnap) => {
@@ -223,9 +222,15 @@ export default function UserView({
   const [shiftTimeSlot, setShiftTimeSlot] = useState<string>('08:00 - 17:00');
   const [tripType, setTripType] = useState<'roundTrip' | 'inboundOnly' | 'outboundOnly'>('roundTrip');
 
+  // กรองสายรถตามกะ และแยกตามช่วงเวลาของกะ Shift
   const filteredRoutesList = routesList.filter(r => {
     if (!r.shiftType || r.shiftType === 'All' || r.shiftType === ' ทุกกะ') return true;
-    return r.shiftType === shiftType;
+    if (r.shiftType !== shiftType) return false;
+    if (shiftType === 'Shift') {
+      if (!r.shiftTimeSlot) return true; // รองรับสายรถเก่าที่ยังไม่ได้ตั้งค่าช่วงเวลา
+      return r.shiftTimeSlot === shiftTimeSlot;
+    }
+    return true;
   });
 
   const [selectedRouteId, setSelectedRouteId] = useState(filteredRoutesList[0]?.id || routesList[0]?.id || '');
@@ -234,14 +239,21 @@ export default function UserView({
   const [selectedStationIndex, setSelectedStationIndex] = useState<number>(0);
   const [travelDate, setTravelDate] = useState('');
 
+  // อัปเดตสายรถที่เลือกอัตโนมัติเมื่อเปลี่ยนกะหรือเปลี่ยนช่วงเวลาของกะ Shift
   useEffect(() => {
-    if (filteredRoutesList.length > 0 && !filteredRoutesList.some(r => r.id === selectedRouteId)) {
-      setSelectedRouteId(filteredRoutesList[0].id);
-      setSelectedRouteName(filteredRoutesList[0].name);
-      setSelectedRouteMaxSeats(filteredRoutesList[0].totalSeats || 14);
+    if (filteredRoutesList.length > 0) {
+      if (!filteredRoutesList.some(r => r.id === selectedRouteId)) {
+        setSelectedRouteId(filteredRoutesList[0].id);
+        setSelectedRouteName(filteredRoutesList[0].name);
+        setSelectedRouteMaxSeats(filteredRoutesList[0].totalSeats || 14);
+        setSelectedStationIndex(0);
+      }
+    } else {
+      setSelectedRouteId('');
+      setSelectedRouteName('');
       setSelectedStationIndex(0);
     }
-  }, [shiftType, routesList]);
+  }, [shiftType, shiftTimeSlot, routesList]);
 
   const todayStr = getTodayDateString();
   const summaryBookings = bookingsList.filter(b => b.travelDate === selectedSummaryDate);
@@ -370,12 +382,10 @@ export default function UserView({
 
   const activeStations = getRouteStations(filteredRoutesList.find(r => r.id === selectedRouteId) || filteredRoutesList[0] || routesList[0]);
 
-  // กำหนดตัวแปรแสดงชื่อและแผนก
   const rawIdFromEmail = user?.email ? user.email.split('@')[0] : '01A01';
   const isUserAdmin = user?.email?.includes('admin') || employeeData?.employeeId?.toUpperCase() === 'ADMIN' || employeeData?.role === 'admin';
   const displayEmployeeCode = isUserAdmin ? 'ADMIN' : (employeeData?.employeeId || rawIdFromEmail).toUpperCase();
   
-  // ใช้ข้อมูลจาก Database เป็นหลัก ถ้ายังโหลดไม่เสร็จจะขึ้นกำลังโหลด...
   const displayEmployeeName = employeeData?.name || (employeeData === null ? 'ไม่พบชื่อในระบบ' : 'กำลังโหลดชื่อ...');
   const displayDepartment = employeeData?.department || (employeeData === null ? '-' : 'กำลังโหลดแผนก...');
 
@@ -413,7 +423,6 @@ export default function UserView({
           </div>
         </div>
 
-        {/* 🟢 แสดงชื่อพนักงาน แผนก และรหัสพนักงาน */}
         <div className="flex items-center gap-3 border-l border-slate-200 dark:border-slate-700 pl-3">
           <div className="text-right">
             <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100">{displayEmployeeName}</p>
@@ -440,7 +449,6 @@ export default function UserView({
             </div>
           )}
 
-          {/* 🌟 กล่องข้อความต้อนรับสีน้ำเงินเข้ม (อยู่ด้านบน) */}
           <div className="relative overflow-hidden bg-gradient-to-br from-blue-900 via-slate-900 to-slate-950 p-6 md:p-8 rounded-2xl text-white shadow-xl border border-slate-800">
             <div className="relative z-10 max-w-2xl space-y-3">
               <div className="flex flex-wrap items-center gap-2">
@@ -457,7 +465,6 @@ export default function UserView({
             </div>
           </div>
 
-          {/* 🌟 เมนูลัดขนาดใหญ่ 4 สี (อยู่ด้านล่างกล่องต้อนรับ) */}
           <div className="bg-white dark:bg-slate-900 p-4.5 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-md space-y-3">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-2">
               <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">เมนูลัดใช้งานด่วน (กดเลือกเมนูที่ต้องการได้ทันที)</h3>
@@ -465,7 +472,6 @@ export default function UserView({
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {/* ปุ่มจองรถ (สีน้ำเงิน) */}
               <button 
                 onClick={() => setActiveMenu('booking')}
                 className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white shadow-md transition-all active:scale-98 cursor-pointer text-left border border-blue-500"
@@ -479,7 +485,6 @@ export default function UserView({
                 </div>
               </button>
 
-              {/* ปุ่มประวัติ (สีเขียว) */}
               <button 
                 onClick={() => setActiveMenu('history')}
                 className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-md transition-all active:scale-98 cursor-pointer text-left border border-emerald-500"
@@ -493,7 +498,6 @@ export default function UserView({
                 </div>
               </button>
 
-              {/* ปุ่มแจ้งเปลี่ยนกะ (สีส้ม) */}
               <button 
                 onClick={() => setActiveMenu('shiftRequest')}
                 className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white shadow-md transition-all active:scale-98 cursor-pointer text-left border border-amber-500"
@@ -507,7 +511,6 @@ export default function UserView({
                 </div>
               </button>
 
-              {/* ปุ่มคู่มือ (สีชมพู/ม่วง) */}
               <button 
                 onClick={() => setActiveMenu('manual')}
                 className="flex items-center gap-3.5 p-3.5 rounded-2xl bg-fuchsia-600 hover:bg-fuchsia-700 text-white shadow-md transition-all active:scale-98 cursor-pointer text-left border border-fuchsia-500"
@@ -670,7 +673,7 @@ export default function UserView({
         </div>
       )}
 
-      {/* 🗺️ ROUTE MAP SIMULATION TAB (เพิ่มเติมตามที่คุณต้องการ) */}
+      {/* 🗺️ ROUTE MAP SIMULATION TAB */}
       {activeMenu === 'routeMap' && (
         <div className="max-w-4xl mx-auto space-y-5">
           <div className="border-b border-slate-200 dark:border-slate-800 pb-3 flex justify-between items-center">
@@ -689,7 +692,6 @@ export default function UserView({
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              {/* รายชื่อสายรถด้านซ้าย */}
               <div className="md:col-span-1 space-y-2.5 max-h-[600px] overflow-y-auto pr-1">
                 <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-1">เลือกสายรถที่ต้องการตรวจสอบ</p>
                 {routesList.map((r: any) => {
@@ -704,10 +706,10 @@ export default function UserView({
                           : 'bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 border-slate-200 dark:border-slate-800 hover:border-indigo-300'
                       }`}
                     >
-                      <div className="flex justify-between items-start">
+                      <div className="flex justify-between items-start gap-1">
                         <span className="font-bold text-xs">{r.name}</span>
-                        <span className={`text-[10px] px-2 py-0.5 rounded font-medium ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>
-                          {r.shiftType || 'ทุกกะ'}
+                        <span className={`text-[10px] px-2 py-0.5 rounded font-medium shrink-0 ${isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>
+                          {r.shiftType || 'ทุกกะ'}{r.shiftType === 'Shift' && r.shiftTimeSlot ? ` (${r.shiftTimeSlot})` : ''}
                         </span>
                       </div>
                       <p className={`text-[11px] ${isSelected ? 'text-indigo-100' : 'text-slate-500 dark:text-slate-400'}`}>
@@ -718,17 +720,17 @@ export default function UserView({
                 })}
               </div>
 
-              {/* รายละเอียดแผนผังจำลองเส้นทางด้านขวา */}
               <div className="md:col-span-2 bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl space-y-5">
                 {selectedRouteForMapTab ? (
                   <>
                     <div className="border-b border-slate-100 dark:border-slate-800 pb-4 space-y-2">
-                      <div className="flex justify-between items-start">
+                      <div className="flex justify-between items-start gap-2">
                         <h4 className="font-bold text-base text-slate-900 dark:text-white">
                           เส้นทางเดินรถ: {selectedRouteForMapTab.name}
                         </h4>
-                        <span className="bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 px-3 py-1 rounded-full text-xs font-bold">
+                        <span className="bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 px-3 py-1 rounded-full text-xs font-bold shrink-0">
                           {selectedRouteForMapTab.shiftType || 'ทุกกะ'}
+                          {selectedRouteForMapTab.shiftType === 'Shift' && selectedRouteForMapTab.shiftTimeSlot ? ` (${selectedRouteForMapTab.shiftTimeSlot})` : ''}
                         </span>
                       </div>
                       <div className="flex flex-wrap gap-4 text-xs text-slate-500 dark:text-slate-400 pt-1">
@@ -903,7 +905,9 @@ export default function UserView({
 
                   <div className="space-y-2 pt-2 border-t border-slate-200 dark:border-slate-800">
                     <div className="flex justify-between items-center">
-                      <label className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">1.2 เลือกสายรถตู้สวัสดิการ</label>
+                      <label className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 tracking-wider">
+                        1.2 เลือกสายรถตู้สวัสดิการ {shiftType === 'Shift' ? `(${shiftTimeSlot})` : ''}
+                      </label>
                       <span className="text-[10px] text-slate-400">{filteredRoutesList.length} รายการ</span>
                     </div>
                     
@@ -920,10 +924,10 @@ export default function UserView({
                             }} 
                             className={`p-3.5 border rounded-xl cursor-pointer transition-all ${selectedRouteId === r.id ? 'border-blue-600 bg-blue-50/20 dark:bg-blue-950/30 ring-1 ring-blue-600' : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50'}`}
                           >
-                            <div className="flex justify-between items-start">
+                            <div className="flex justify-between items-start gap-2">
                               <p className="font-semibold text-slate-900 dark:text-white text-xs">{r.name}</p>
-                              <span className="text-[10px] px-2 py-0.5 rounded font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
-                                {r.shiftType || 'ทุกกะ'}
+                              <span className="text-[10px] px-2 py-0.5 rounded font-medium bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 shrink-0">
+                                {r.shiftType || 'ทุกกะ'}{r.shiftType === 'Shift' && r.shiftTimeSlot ? ` (${r.shiftTimeSlot})` : ''}
                               </span>
                             </div>
                             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">ทะเบียน: {r.plate || r.vanPlate} | คนขับ: {r.driver || r.driverName}</p>
@@ -931,7 +935,7 @@ export default function UserView({
                         ))
                       ) : (
                         <div className="p-4 text-center text-xs text-slate-400 border border-dashed rounded-xl">
-                          ไม่พบสายรถตู้สำหรับกะเวลานี้
+                          ไม่พบสายรถตู้สำหรับกะและช่วงเวลานี้
                         </div>
                       )}
                     </div>
@@ -995,8 +999,8 @@ export default function UserView({
                         showAlert('error', 'ระบบปิด', closeReasonMessage);
                         return;
                       }
-                      if (filteredRoutesList.length === 0) {
-                        showAlert('warning', 'คำเตือน', 'กรุณาเลือกกะเวลาที่มีสายรถเปิดให้บริการ');
+                      if (filteredRoutesList.length === 0 || !selectedRouteId) {
+                        showAlert('warning', 'คำเตือน', 'กรุณาเลือกกะและช่วงเวลาที่มีสายรถเปิดให้บริการ');
                         return;
                       }
                       setBookingStep(2);
@@ -1425,9 +1429,11 @@ export default function UserView({
               filteredHistory.map((b: any, idx: number) => (
                 <div key={idx} className="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="space-y-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <span className="font-bold text-slate-900 dark:text-white text-xs">{b.route}</span>
-                      <span className="text-[10px] bg-purple-50 dark:bg-purple-950/40 text-purple-600 px-2 py-0.5 rounded font-medium">กะ: {b.shiftType}</span>
+                      <span className="text-[10px] bg-purple-50 dark:bg-purple-950/40 text-purple-600 px-2 py-0.5 rounded font-medium">
+                        กะ: {b.shiftType}{b.shiftType === 'Shift' && b.shiftTimeSlot ? ` (${b.shiftTimeSlot})` : ''}
+                      </span>
                       <span className="text-[10px] bg-blue-50 dark:bg-blue-950/40 text-blue-600 px-2 py-0.5 rounded font-medium">
                         {b.tripType === 'inboundOnly' ? 'เฉพาะขามา' : b.tripType === 'outboundOnly' ? 'เฉพาะขากลับ' : 'ไป-กลับ'}
                       </span>
@@ -1519,7 +1525,6 @@ export default function UserView({
             <div className="flex-1 overflow-y-auto space-y-6 pr-1">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 
-                {/* ระเบียบปฏิบัติ & คำแนะนำ */}
                 <div className="space-y-2.5">
                   <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
                     <span className="text-base">📋</span>
@@ -1533,7 +1538,6 @@ export default function UserView({
                   </ul>
                 </div>
 
-                {/* วิธีการจอง */}
                 <div className="space-y-2.5">
                   <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
                     <span className="text-base">📱</span>
@@ -1550,7 +1554,6 @@ export default function UserView({
 
               </div>
 
-              {/* ติดต่อสอบถาม */}
               <div className="space-y-2 bg-rose-50 dark:bg-rose-950/30 p-4 rounded-xl border border-rose-200 dark:border-rose-900/50">
                 <div className="flex items-center gap-2 text-rose-700 dark:text-rose-400">
                   <span className="text-base">📞</span>
@@ -1603,29 +1606,53 @@ export default function UserView({
               {summaryBookings.length === 0 ? (
                 <div className="py-12 text-center text-slate-400">ไม่มีพนักงานลงทะเบียนเดินทางสำหรับวันที่ {formatThaiDate(selectedSummaryDate)}</div>
               ) : (
-                routesList.map((route: any) => {
-                  const routeBookings = summaryBookings.filter((b: any) => b.route === route.name);
-                  if (routeBookings.length === 0) return null;
-                  return (
-                    <div key={route.id} className="p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
-                      <div className="flex justify-between items-center border-b border-slate-200/60 dark:border-slate-800 pb-2">
-                        <span className="font-bold text-blue-600 dark:text-blue-400 text-xs">{route.name}</span>
-                        <span className="text-[10px] bg-slate-200 dark:bg-slate-800 px-2 py-0.5 rounded font-semibold">{routeBookings.length} รายการ</span>
-                      </div>
-                      <div className="space-y-1.5">
-                        {routeBookings.map((b: any, bIdx: number) => (
-                          <div key={bIdx} className="flex justify-between items-center bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-800 text-[11px]">
-                            <div>
-                              <span className="font-bold text-slate-800 dark:text-slate-100">{bIdx + 1}. {b.employeeName || b.employeeEmail}</span>
-                              <span className="block text-slate-400">จุดขึ้นรถ: {b.pickupLocation} ({b.time})</span>
-                            </div>
-                            <span className="font-mono text-slate-600 dark:text-slate-300">{b.employeePhone || '-'}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
+                (() => {
+                  const uniqueRouteKeys = Array.from(
+                    new Set(
+                      summaryBookings.map((b: any) => {
+                        const rName = (b.route || b.routeName || 'ไม่ระบุสายรถ').trim();
+                        const rShift = b.shiftType || b.shift || 'Day';
+                        const rSlot = rShift === 'Shift' && b.shiftTimeSlot ? b.shiftTimeSlot : '';
+                        return `${rName}__${rShift}__${rSlot}`;
+                      })
+                    )
                   );
-                })
+
+                  return uniqueRouteKeys.map((key) => {
+                    const [routeName, shiftLabel, slotLabel] = key.split('__');
+                    const routeBookings = summaryBookings.filter((b: any) => {
+                      const bName = (b.route || b.routeName || 'ไม่ระบุสายรถ').trim();
+                      const bShift = b.shiftType || b.shift || 'Day';
+                      const bSlot = bShift === 'Shift' && b.shiftTimeSlot ? b.shiftTimeSlot : '';
+                      return bName === routeName && bShift === shiftLabel && bSlot === slotLabel;
+                    });
+
+                    return (
+                      <div key={key} className="p-4 bg-slate-50 dark:bg-slate-950 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+                        <div className="flex justify-between items-center border-b border-slate-200/60 dark:border-slate-800 pb-2 gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-blue-600 dark:text-blue-400 text-xs">{routeName}</span>
+                            <span className="text-[10px] px-2 py-0.5 rounded font-semibold bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-300 border border-purple-200/70 dark:border-purple-900">
+                              {shiftLabel}{slotLabel ? ` (${slotLabel})` : ''}
+                            </span>
+                          </div>
+                          <span className="text-[10px] bg-slate-200 dark:bg-slate-800 px-2 py-0.5 rounded font-semibold shrink-0">{routeBookings.length} รายการ</span>
+                        </div>
+                        <div className="space-y-1.5">
+                          {routeBookings.map((b: any, bIdx: number) => (
+                            <div key={b.id || bIdx} className="flex justify-between items-center bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-800 text-[11px]">
+                              <div>
+                                <span className="font-bold text-slate-800 dark:text-slate-100">{bIdx + 1}. {b.employeeName || b.name || b.employeeEmail}</span>
+                                <span className="block text-slate-400">จุดขึ้นรถ: {b.pickupLocation || b.station} ({b.time || '-'})</span>
+                              </div>
+                              <span className="font-mono text-slate-600 dark:text-slate-300">{b.employeePhone || b.phone || '-'}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  });
+                })()
               )}
             </div>
 

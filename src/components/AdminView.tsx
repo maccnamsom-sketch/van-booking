@@ -88,6 +88,7 @@ const translations = {
     addRouteTitle: '➕ สร้างและเพิ่มสายรถคันใหม่',
     cancelEdit: 'ยกเลิกแก้ไข',
     selectShift: 'เลือกกะการทำงานสายรถ',
+    selectShiftTime: 'เลือกช่วงเวลากะ Shift',
     routeNameLabel: 'ชื่อเรียกสายรถ (เช่น สายบ้านฉาง)',
     routePlateLabel: 'เลขทะเบียนรถ',
     driverNameLabel: 'ชื่อพนักงานคนขับ',
@@ -207,6 +208,7 @@ const translations = {
     addRouteTitle: '➕ Add New Van Route',
     cancelEdit: 'Cancel Edit',
     selectShift: 'Select Shift Type',
+    selectShiftTime: 'Select Shift Time Slot',
     routeNameLabel: 'Route Name (e.g. Ban Chang Line)',
     routePlateLabel: 'License Plate Number',
     driverNameLabel: 'Driver Name',
@@ -301,7 +303,9 @@ export default function AdminView({
   const [rejectReasonInputs, setRejectReasonInputs] = useState<{ [id: string]: string }>({});
   const [rejectingId, setRejectingId] = useState<string | null>(null);
 
+  // ตัวกรองสายรถฝั่ง Admin
   const [adminRouteFilter, setAdminRouteFilter] = useState<'Day' | 'Shift'>('Day');
+  const [adminShiftTimeFilter, setAdminShiftTimeFilter] = useState<'ALL' | '06:00 - 18:30' | '18:00 - 06:30'>('ALL');
 
   const getTodayDateString = () => {
     const today = new Date();
@@ -319,7 +323,6 @@ export default function AdminView({
   const [newEmpId, setNewEmpId] = useState('');
   const [newEmpDept, setNewEmpDept] = useState('');
   
-  // ✏️ State สำหรับโหมดแก้ไขข้อมูลพนักงาน
   const [editingEmpId, setEditingEmpId] = useState<string | null>(null);
 
   const [localEmployeesList, setLocalEmployeesList] = useState<any[]>([]);
@@ -340,6 +343,7 @@ export default function AdminView({
   const [newRouteDriver, setNewRouteDriver] = useState('');
   const [newRoutePhone, setNewRoutePhone] = useState('');
   const [newRouteShift, setNewRouteShift] = useState<'Day' | 'Shift'>('Day');
+  const [newRouteShiftTime, setNewRouteShiftTime] = useState<'06:00 - 18:30' | '18:00 - 06:30'>('06:00 - 18:30');
 
   const [stationInput, setStationInput] = useState('');
   const [timeInput, setTimeInput] = useState('');
@@ -414,7 +418,6 @@ export default function AdminView({
     }
   };
 
-  // 💾 ฟังก์ชันบันทึก / แก้ไขข้อมูลพนักงาน
   const handleSaveEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newEmpName || !newEmpId) return;
@@ -423,7 +426,6 @@ export default function AdminView({
 
     try {
       if (editingEmpId) {
-        // อัปเดตข้อมูลพนักงานเดิม
         await updateDoc(doc(db, 'employees', editingEmpId), {
           name: newEmpName.trim(),
           department: newEmpDept.trim() || 'General',
@@ -432,7 +434,6 @@ export default function AdminView({
         showAlert('success', 'สำเร็จ', `อัปเดตข้อมูลพนักงานรหัส ${editingEmpId} เรียบร้อย!`);
         setEditingEmpId(null);
       } else {
-        // เพิ่มพนักงานใหม่ + สร้าง Auth
         const email = `${empIdTrim}@company.com`;
         const password = `${empIdTrim}@aero`;
 
@@ -467,7 +468,6 @@ export default function AdminView({
     }
   };
 
-  // ✏️ คลิกปุ่มแก้ไขพนักงานเพื่อดึงข้อมูลมาใส่ฟอร์ม
   const handleEditEmployeeClick = (emp: any) => {
     setEditingEmpId(emp.id || emp.employeeId);
     setNewEmpId(emp.employeeId || emp.id || '');
@@ -545,10 +545,15 @@ export default function AdminView({
     return true;
   });
 
+  // กรองสายรถฝั่ง Admin ทั้งกะและช่วงเวลา
   const filteredAdminRoutes = routesList.filter(r => {
     const type = r.shiftType || r.shift || 'Day';
-    if (type === 'All') return true;
-    return type === adminRouteFilter;
+    if (adminRouteFilter === 'Day') {
+      return type === 'Day' || type === 'All';
+    }
+    if (type !== 'Shift') return false;
+    if (adminShiftTimeFilter === 'ALL') return true;
+    return r.shiftTimeSlot === adminShiftTimeFilter;
   });
 
   const filteredEmployeesList = localEmployeesList.filter(emp => {
@@ -589,6 +594,7 @@ export default function AdminView({
     setNewRouteDriver(r.driver || r.driverName || '');
     setNewRoutePhone(r.phone || '');
     setNewRouteShift(r.shiftType || r.shift || 'Day');
+    setNewRouteShiftTime(r.shiftTimeSlot === '18:00 - 06:30' ? '18:00 - 06:30' : '06:00 - 18:30');
     setStopsList(r.stops || r.stations || []);
   };
 
@@ -599,6 +605,7 @@ export default function AdminView({
     setNewRouteDriver(''); 
     setNewRoutePhone('');
     setNewRouteShift('Day');
+    setNewRouteShiftTime('06:00 - 18:30');
     setStopsList([]);
   };
 
@@ -615,6 +622,7 @@ export default function AdminView({
         phone: newRoutePhone,
         shiftType: newRouteShift,
         shift: newRouteShift,
+        shiftTimeSlot: newRouteShift === 'Shift' ? newRouteShiftTime : '08:00 - 17:00',
         stops: stopsList,
         stations: stopsList,
         totalSeats: 14,
@@ -961,17 +969,19 @@ export default function AdminView({
                   const bShift = b.shiftType || b.shift || 'Day';
 
                   const matchShift = rShift === 'All' || bShift === rShift;
-                  return matchRoute && matchShift;
+                  const matchTimeSlot = rShift !== 'Shift' || !route.shiftTimeSlot || !b.shiftTimeSlot || route.shiftTimeSlot === b.shiftTimeSlot;
+                  return matchRoute && matchShift && matchTimeSlot;
                 });
                 
                 return (
                   <div key={route.id} className="p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm space-y-3">
                     <div className="flex justify-between items-start border-b border-slate-200 dark:border-slate-800 pb-3">
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <h4 className="font-extrabold text-blue-600 dark:text-blue-400 text-base">{route.name}</h4>
                           <span className={`text-[10px] px-2 py-0.5 rounded font-bold border ${(route.shiftType || route.shift) === 'Shift' ? 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900' : 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900'}`}>
                             {route.shiftType || route.shift || 'Day'}
+                            {(route.shiftType || route.shift) === 'Shift' && route.shiftTimeSlot ? ` (${route.shiftTimeSlot})` : ''}
                           </span>
                         </div>
                         <p className="text-xs text-slate-400 mt-1">{t.plate} {route.plate || route.vanPlate || '-'} | {t.driver} {route.driver || route.driverName || '-'} ({route.phone || '-'})</p>
@@ -1086,6 +1096,37 @@ export default function AdminView({
                 </div>
               </div>
 
+              {/* เลือกช่วงเวลากะ Shift แยก 2 เวลา */}
+              {newRouteShift === 'Shift' && (
+                <div className="p-3 bg-purple-50/40 dark:bg-purple-950/20 rounded-xl border border-purple-200/70 dark:border-purple-900/50 space-y-2">
+                  <label className="block text-purple-700 dark:text-purple-300 font-bold">{t.selectShiftTime}</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNewRouteShiftTime('06:00 - 18:30')}
+                      className={`p-2 rounded-lg border font-bold transition-all cursor-pointer ${
+                        newRouteShiftTime === '06:00 - 18:30'
+                          ? 'bg-purple-600 border-purple-600 text-white shadow-sm'
+                          : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      06:00 - 18:30
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewRouteShiftTime('18:00 - 06:30')}
+                      className={`p-2 rounded-lg border font-bold transition-all cursor-pointer ${
+                        newRouteShiftTime === '18:00 - 06:30'
+                          ? 'bg-purple-600 border-purple-600 text-white shadow-sm'
+                          : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      18:00 - 06:30
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div><label className="block text-slate-400 font-bold mb-1">{t.routeNameLabel}</label><input type="text" placeholder="e.g. Ban Chang Line..." value={newRouteName} onChange={e => setNewRouteName(e.target.value)} className="w-full border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl dark:bg-slate-950 focus:outline-none focus:border-blue-500" required /></div>
               <div><label className="block text-slate-400 font-bold mb-1">{t.routePlateLabel}</label><input type="text" placeholder="e.g. Fv04..." value={newRoutePlate} onChange={e => setNewRoutePlate(e.target.value)} className="w-full border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl dark:bg-slate-950 focus:outline-none focus:border-blue-500" required /></div>
               <div><label className="block text-slate-400 font-bold mb-1">{t.driverNameLabel}</label><input type="text" placeholder="Driver name..." value={newRouteDriver} onChange={e => setNewRouteDriver(e.target.value)} className="w-full border border-slate-200 dark:border-slate-800 p-2.5 rounded-xl dark:bg-slate-950 focus:outline-none focus:border-blue-500" /></div>
@@ -1117,22 +1158,49 @@ export default function AdminView({
           </div>
 
           <div className="md:col-span-7 space-y-4">
-            <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-              <span className="font-extrabold text-xs text-slate-600 dark:text-slate-300">{t.filterRoutesByShift}</span>
-              <div className="flex gap-2">
-                <button 
-                  onClick={() => setAdminRouteFilter('Day')}
-                  className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${adminRouteFilter === 'Day' ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}
-                >
-                  ☀️ Day ({routesList.filter(r => { const t = r.shiftType || r.shift || 'Day'; return t === 'Day' || t === 'All'; }).length})
-                </button>
-                <button 
-                  onClick={() => setAdminRouteFilter('Shift')}
-                  className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${adminRouteFilter === 'Shift' ? 'bg-purple-600 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}
-                >
-                  🌙 Shift ({routesList.filter(r => { const t = r.shiftType || r.shift; return t === 'Shift'; }).length})
-                </button>
+            <div className="bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="font-extrabold text-xs text-slate-600 dark:text-slate-300">{t.filterRoutesByShift}</span>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => setAdminRouteFilter('Day')}
+                    className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${adminRouteFilter === 'Day' ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}
+                  >
+                    ☀️ Day ({routesList.filter(r => { const t = r.shiftType || r.shift || 'Day'; return t === 'Day' || t === 'All'; }).length})
+                  </button>
+                  <button 
+                    onClick={() => { setAdminRouteFilter('Shift'); setAdminShiftTimeFilter('ALL'); }}
+                    className={`px-4 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${adminRouteFilter === 'Shift' ? 'bg-purple-600 text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}
+                  >
+                    🌙 Shift ({routesList.filter(r => { const t = r.shiftType || r.shift; return t === 'Shift'; }).length})
+                  </button>
+                </div>
               </div>
+
+              {/* ตัวกรองย่อยแยก 2 ช่วงเวลาสำหรับกะ Shift */}
+              {adminRouteFilter === 'Shift' && (
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <span className="text-[11px] font-bold text-slate-400">ช่วงเวลา:</span>
+                  <button
+                    onClick={() => setAdminShiftTimeFilter('ALL')}
+                    className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${adminShiftTimeFilter === 'ALL' ? 'bg-purple-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}
+                  >
+                    ทั้งหมด ({routesList.filter(r => (r.shiftType || r.shift) === 'Shift').length})
+                  </button>
+                  <button
+                    onClick={() => setAdminShiftTimeFilter('06:00 - 18:30')}
+                    className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${adminShiftTimeFilter === '06:00 - 18:30' ? 'bg-purple-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}
+                  >
+                    06:00 - 18:30 ({routesList.filter(r => (r.shiftType || r.shift) === 'Shift' && r.shiftTimeSlot === '06:00 - 18:30').length})
+                  </button>
+                  <button
+                    onClick={() => setAdminShiftTimeFilter('18:00 - 06:30')}
+                    className={`px-3 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${adminShiftTimeFilter === '18:00 - 06:30' ? 'bg-purple-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}
+                  >
+                    18:00 - 06:30 ({routesList.filter(r => (r.shiftType || r.shift) === 'Shift' && r.shiftTimeSlot === '18:00 - 06:30').length})
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="space-y-3">
@@ -1147,6 +1215,7 @@ export default function AdminView({
                           {r.name} 
                           <span className={`ml-2 inline-block text-[10px] px-2 py-0.5 rounded font-bold border ${isShift ? 'bg-purple-50 text-purple-600 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-900' : 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900'}`}>
                             {r.shiftType || r.shift || 'Day'}
+                            {isShift && r.shiftTimeSlot ? ` (${r.shiftTimeSlot})` : ''}
                           </span>
                           <span className="block text-slate-400 font-normal text-xs font-mono mt-0.5">{t.plate} {r.plate || r.vanPlate || '-'} · {t.driver} {r.driver || r.driverName || '-'} ({r.phone || '-'})</span>
                         </h4>
@@ -1167,7 +1236,7 @@ export default function AdminView({
                 })
               ) : (
                 <div className="text-center py-16 bg-white dark:bg-slate-900 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl text-slate-400">
-                  {t.noRoutesFound} <span className="font-bold text-slate-600 dark:text-slate-300">({adminRouteFilter})</span>
+                  {t.noRoutesFound} <span className="font-bold text-slate-600 dark:text-slate-300">({adminRouteFilter}{adminRouteFilter === 'Shift' && adminShiftTimeFilter !== 'ALL' ? ` - ${adminShiftTimeFilter}` : ''})</span>
                 </div>
               )}
             </div>
@@ -1175,7 +1244,6 @@ export default function AdminView({
         </div>
       )}
 
-      {/* 3. EMPLOYEES TAB (รองรับทั้งเพิ่ม, ค้นหา, และแก้ไขข้อมูลพนักงาน) */}
       {adminTab === 'employees' && (
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
           <div className="md:col-span-5 p-5 bg-white dark:bg-slate-900 border rounded-2xl shadow-sm border-slate-200 dark:border-slate-800 h-fit space-y-4">
