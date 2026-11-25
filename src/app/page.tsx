@@ -147,17 +147,17 @@ export default function EnterpriseVanBookingSystem() {
     };
 
     return (
-      <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-gradient-to-br from-[#EAF3FF] via-[#F5F8FF] to-[#DCEAFF] p-4 sm:p-6">
+      <div className="relative flex min-h-[100svh] min-h-screen w-full items-center justify-center overflow-hidden bg-gradient-to-br from-[#EAF3FF] via-[#F5F8FF] to-[#DCEAFF] p-0 md:min-h-screen md:p-4 lg:p-6">
 
         {/* Background glow */}
-        <div className="pointer-events-none absolute -top-32 -left-24 h-96 w-96 rounded-full bg-blue-300/40 blur-[100px]" />
-        <div className="pointer-events-none absolute -bottom-32 -right-24 h-96 w-96 rounded-full bg-sky-300/50 blur-[110px]" />
-        <div className="pointer-events-none absolute top-1/3 right-1/4 h-64 w-64 rounded-full bg-indigo-200/30 blur-[90px]" />
+        <div className="pointer-events-none absolute -top-32 -left-24 hidden h-96 w-96 rounded-full bg-blue-300/40 blur-[100px] md:block" />
+        <div className="pointer-events-none absolute -bottom-32 -right-24 hidden h-96 w-96 rounded-full bg-sky-300/50 blur-[110px] md:block" />
+        <div className="pointer-events-none absolute top-1/3 right-1/4 hidden h-64 w-64 rounded-full bg-indigo-200/30 blur-[90px] md:block" />
 
-        <div className="relative z-10 w-full max-w-5xl overflow-hidden rounded-[30px] border border-white/80 bg-white/75 shadow-[0_25px_80px_rgba(72,111,180,0.18),0_0_40px_rgba(111,170,255,0.12)] backdrop-blur-2xl md:grid md:grid-cols-2">
+        <div className="relative z-10 h-[100svh] min-h-[100svh] w-full max-w-none overflow-hidden rounded-none border-0 bg-white shadow-none backdrop-blur-2xl md:h-auto md:min-h-0 md:max-w-5xl md:rounded-[30px] md:border md:border-white/80 md:bg-white/75 md:shadow-[0_25px_80px_rgba(72,111,180,0.18),0_0_40px_rgba(111,170,255,0.12)] md:grid md:grid-cols-2">
 
           {/* LEFT BRAND PANEL */}
-          <div className="relative flex flex-col justify-between overflow-hidden bg-gradient-to-br from-[#253F76] via-[#3768AC] to-[#79A9ED] p-7 text-white sm:p-10 md:min-h-[570px]">
+          <div className="relative hidden flex-col justify-between overflow-hidden bg-gradient-to-br from-[#253F76] via-[#3768AC] to-[#79A9ED] p-7 text-white sm:p-10 md:flex md:min-h-[570px]">
 
             {/* Light effects */}
             <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full border border-white/20 bg-white/10 blur-2xl" />
@@ -214,7 +214,7 @@ export default function EnterpriseVanBookingSystem() {
           </div>
 
           {/* RIGHT LOGIN PANEL */}
-          <div className="relative flex flex-col justify-center bg-white/75 p-6 sm:p-10 md:p-12">
+          <div className="relative flex h-full min-h-0 flex-col justify-center overflow-y-auto bg-white px-6 py-5 sm:p-10 md:h-auto md:overflow-visible md:bg-white/75 md:p-12">
 
             {/* Top decorative glow */}
             <div className="pointer-events-none absolute right-0 top-0 h-48 w-48 rounded-full bg-blue-100/60 blur-[75px]" />
@@ -222,8 +222,8 @@ export default function EnterpriseVanBookingSystem() {
             <div className="relative z-10 mx-auto w-full max-w-sm">
 
               {/* Logo mobile */}
-              <div className="mb-7 flex items-center justify-center md:hidden">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-blue-100 bg-white p-2 shadow-[0_5px_25px_rgba(80,140,220,0.18)]">
+              <div className="mb-4 flex items-center justify-center md:hidden">
+                <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-blue-100 bg-white p-2 shadow-[0_5px_25px_rgba(80,140,220,0.14)]">
                   <img
                     src="/aeroflex-logo.png"
                     alt="AEROFLEx Logo"
@@ -232,21 +232,21 @@ export default function EnterpriseVanBookingSystem() {
                 </div>
               </div>
 
-              <div className="mb-8 text-center md:text-left">
+              <div className="mb-5 text-center md:mb-8 md:text-left">
                 <span className="text-[10px] font-bold tracking-[0.2em] text-[#6B94CF]">
                   WELCOME BACK
                 </span>
 
-                <h2 className="mt-2 text-3xl font-black tracking-tight text-[#243B68]">
+                <h2 className="mt-1.5 text-2xl font-black tracking-tight text-[#243B68] md:mt-2 md:text-3xl">
                   เข้าสู่ระบบ
                 </h2>
 
-                <p className="mt-2 text-sm leading-6 text-slate-400">
+                <p className="mt-1.5 text-xs leading-5 text-slate-400 md:mt-2 md:text-sm md:leading-6">
                   กรุณากรอกรหัสพนักงานของคุณเพื่อเข้าสู่ระบบ
                 </p>
               </div>
 
-              <form onSubmit={handleLogin} className="space-y-5">
+              <form onSubmit={handleLogin} className="space-y-4 md:space-y-5">
 
                 {loginError && (
                   <div className="flex items-center gap-2 rounded-2xl border border-red-100 bg-red-50/90 p-3 text-xs font-medium text-red-600">
@@ -268,7 +268,7 @@ export default function EnterpriseVanBookingSystem() {
                       placeholder="เช่น 12345"
                       value={employeeId}
                       onChange={(e) => setEmployeeId(e.target.value)}
-                      className="w-full rounded-2xl border border-[#DCE8F8] bg-[#F6F9FF]/90 py-4 pl-12 pr-4 text-sm text-[#263F6D] outline-none transition-all placeholder:text-slate-400 hover:border-blue-200 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100/80"
+                      className="w-full rounded-2xl border border-[#DCE8F8] bg-[#F6F9FF]/90 py-3.5 pl-12 pr-4 text-sm text-[#263F6D] outline-none transition-all placeholder:text-slate-400 hover:border-blue-200 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100/80 md:py-4"
                       required
                     />
                   </div>
@@ -288,7 +288,7 @@ export default function EnterpriseVanBookingSystem() {
                         placeholder="กรอกรหัสผ่าน"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        className="w-full rounded-2xl border border-[#DCE8F8] bg-[#F6F9FF]/90 py-4 pl-12 pr-4 text-sm text-[#263F6D] outline-none transition-all placeholder:text-slate-400 hover:border-blue-200 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100/80"
+                        className="w-full rounded-2xl border border-[#DCE8F8] bg-[#F6F9FF]/90 py-3.5 pl-12 pr-4 text-sm text-[#263F6D] outline-none transition-all placeholder:text-slate-400 hover:border-blue-200 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100/80 md:py-4"
                         required={isLoginAdmin}
                       />
                     </div>
@@ -298,7 +298,7 @@ export default function EnterpriseVanBookingSystem() {
                 <button
                   type="submit"
                   disabled={isLoggingIn}
-                  className="group relative mt-3 w-full overflow-hidden rounded-2xl bg-gradient-to-r from-[#356BC1] via-[#4D8BE3] to-[#70A9F5] py-4 text-sm font-bold text-white shadow-[0_8px_24px_rgba(67,126,215,0.30),0_0_18px_rgba(112,169,245,0.20)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(67,126,215,0.40),0_0_28px_rgba(112,169,245,0.35)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="group relative mt-2 w-full overflow-hidden rounded-2xl bg-gradient-to-r from-[#356BC1] via-[#4D8BE3] to-[#70A9F5] py-3.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(67,126,215,0.24)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(67,126,215,0.40),0_0_28px_rgba(112,169,245,0.35)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 md:mt-3 md:py-4"
                 >
                   <span className="relative z-10">
                     {isLoggingIn ? 'กำลังตรวจสอบ...' : 'เข้าสู่ระบบ'}
@@ -308,7 +308,7 @@ export default function EnterpriseVanBookingSystem() {
                 </button>
               </form>
 
-              <div className="mt-9 border-t border-blue-50 pt-6 text-center">
+              <div className="mt-6 border-t border-blue-50 pt-4 text-center md:mt-9 md:pt-6">
                 <p className="text-[11px] leading-6 text-slate-400">
                   หากไม่สามารถเข้าสู่ระบบได้
                   <br />
@@ -319,7 +319,7 @@ export default function EnterpriseVanBookingSystem() {
                 </p>
               </div>
 
-              <div className="mt-6 text-center text-[9px] tracking-[0.16em] text-[#A6B8D3]">
+              <div className="mt-4 text-center text-[9px] tracking-[0.16em] text-[#A6B8D3] md:mt-6">
                 AEROFLEX COMPANY LIMITED
               </div>
             </div>
