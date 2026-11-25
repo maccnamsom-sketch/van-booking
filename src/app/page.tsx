@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from 'firebase/auth';
 import { collection, query, orderBy, onSnapshot, doc } from 'firebase/firestore';
-import { User, Lock, Bus, AlertCircle } from 'lucide-react'; 
+import { User, Lock, AlertCircle } from 'lucide-react'; 
 
 import { auth, db } from '../lib/firebase';
 import UserView from '../components/UserView';
@@ -147,108 +147,183 @@ export default function EnterpriseVanBookingSystem() {
     };
 
     return (
-      <div className="flex min-h-screen w-full items-center justify-center bg-slate-100 p-4 sm:p-6 md:p-8">
-        <div className="flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl sm:rounded-3xl bg-white shadow-xl sm:shadow-2xl border border-slate-200/80 md:flex-row">
-          
-          <div className="hidden w-1/2 flex-col justify-between bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 p-10 text-white md:flex">
-            <div className="flex items-center gap-2.5 font-bold tracking-wider text-blue-400">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-500/20 text-blue-400 border border-blue-400/30">
-                <Bus className="h-5 w-5" />
+      <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-gradient-to-br from-[#EAF3FF] via-[#F5F8FF] to-[#DCEAFF] p-4 sm:p-6">
+
+        {/* Background glow */}
+        <div className="pointer-events-none absolute -top-32 -left-24 h-96 w-96 rounded-full bg-blue-300/40 blur-[100px]" />
+        <div className="pointer-events-none absolute -bottom-32 -right-24 h-96 w-96 rounded-full bg-sky-300/50 blur-[110px]" />
+        <div className="pointer-events-none absolute top-1/3 right-1/4 h-64 w-64 rounded-full bg-indigo-200/30 blur-[90px]" />
+
+        <div className="relative z-10 w-full max-w-5xl overflow-hidden rounded-[30px] border border-white/80 bg-white/75 shadow-[0_25px_80px_rgba(72,111,180,0.18),0_0_40px_rgba(111,170,255,0.12)] backdrop-blur-2xl md:grid md:grid-cols-2">
+
+          {/* LEFT BRAND PANEL */}
+          <div className="relative flex flex-col justify-between overflow-hidden bg-gradient-to-br from-[#253F76] via-[#3768AC] to-[#79A9ED] p-7 text-white sm:p-10 md:min-h-[570px]">
+
+            {/* Light effects */}
+            <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full border border-white/20 bg-white/10 blur-2xl" />
+            <div className="pointer-events-none absolute -bottom-24 -left-20 h-72 w-72 rounded-full bg-sky-300/20 blur-3xl" />
+            <div className="pointer-events-none absolute right-10 top-1/2 h-40 w-40 rounded-full bg-blue-300/20 blur-3xl" />
+
+            <div className="relative z-10 flex items-center gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/30 bg-white/15 p-1.5 shadow-[0_0_25px_rgba(255,255,255,0.18)] backdrop-blur-md">
+                <img
+                  src="/aeroflex-logo.png"
+                  alt="AEROFLEx Logo"
+                  className="h-full w-full object-contain"
+                />
               </div>
-              <span className="text-base font-extrabold text-white">AEROFLEX</span>
+
+              <div>
+                <h1 className="text-lg font-black tracking-[0.16em] text-white">
+                  AEROFLEX
+                </h1>
+                <p className="text-[9px] tracking-[0.18em] text-blue-100">
+                  COMPANY LIMITED
+                </p>
+              </div>
             </div>
 
-            <div className="space-y-3">
-              <span className="inline-block rounded-full bg-blue-500/10 px-3 py-1 text-[11px] font-semibold text-blue-300 border border-blue-500/20">
-                Enterprise Transportation
-              </span>
-              <h1 className="text-2xl font-black leading-snug tracking-tight">
-                ระบบจองรถตู้พนักงาน
-              </h1>
-              <p className="text-xs font-light text-slate-300 leading-relaxed">
-                บริษัท แอร์โรเฟลกซ์ จำกัด — ยกระดับความสะดวกสบายในการเดินทาง รวดเร็ว ปลอดภัย และแม่นยำ
+            <div className="relative z-10 my-10 space-y-5 text-center md:text-left">
+              <div className="inline-flex items-center gap-2 rounded-full border border-white/25 bg-white/10 px-4 py-2 text-[10px] font-semibold tracking-wider text-white shadow-sm backdrop-blur-md">
+                <span className="h-2 w-2 rounded-full bg-emerald-300 shadow-[0_0_10px_rgba(110,255,190,0.9)]" />
+                EMPLOYEE TRANSPORTATION
+              </div>
+
+              <h2 className="text-3xl font-bold leading-relaxed tracking-tight sm:text-4xl">
+                เดินทางสะดวก
+                <br />
+                <span className="text-blue-100">ด้วยระบบจองรถ</span>
+              </h2>
+
+              <p className="max-w-sm text-sm leading-7 text-blue-50/90">
+                ระบบสำรองสิทธิ์เดินทางสำหรับพนักงาน
+                บริษัท แอร์โรเฟลกซ์ จำกัด
+                ใช้งานง่าย สะดวก และรวดเร็ว
               </p>
+
+              <div className="flex items-center gap-3 pt-2">
+                <div className="h-1 w-12 rounded-full bg-white shadow-[0_0_12px_rgba(255,255,255,0.7)]" />
+                <div className="h-1 w-4 rounded-full bg-white/50" />
+                <div className="h-1 w-4 rounded-full bg-white/30" />
+              </div>
             </div>
 
-            <div className="text-[11px] text-slate-400">
-              © AEROFLEX CO., LTD. ALL RIGHTS RESERVED.
+            <div className="relative z-10 hidden text-[10px] tracking-wider text-blue-100/80 md:block">
+              © AEROFLEX COMPANY LIMITED. ALL RIGHTS RESERVED.
             </div>
           </div>
 
-          <div className="flex items-center justify-between bg-gradient-to-r from-slate-900 to-blue-950 px-6 py-5 text-white md:hidden">
-            <div className="flex items-center gap-2.5 font-bold tracking-wider">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-500/20 text-blue-400 border border-blue-400/30">
-                <Bus className="h-4 w-4" />
-              </div>
-              <span className="text-sm font-black text-white">AEROFLEX</span>
-            </div>
-            <span className="text-[10px] font-medium text-slate-300 bg-slate-800/80 px-2.5 py-1 rounded-full border border-slate-700">
-              Van Booking
-            </span>
-          </div>
+          {/* RIGHT LOGIN PANEL */}
+          <div className="relative flex flex-col justify-center bg-white/75 p-6 sm:p-10 md:p-12">
 
-          <div className="flex w-full flex-col justify-center p-6 sm:p-8 md:w-1/2 md:p-12">
-            <div className="mb-6 space-y-1 text-center md:text-left">
-              <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900">เข้าสู่ระบบ</h2>
-              <p className="text-xs text-slate-500">
-                กรุณากรอกรหัสพนักงานของคุณเพื่อเข้าสู่ระบบ
-              </p>
-            </div>
+            {/* Top decorative glow */}
+            <div className="pointer-events-none absolute right-0 top-0 h-48 w-48 rounded-full bg-blue-100/60 blur-[75px]" />
 
-            <form onSubmit={handleLogin} className="space-y-4">
-              {loginError && (
-                <div className="flex items-center gap-2 rounded-xl bg-red-50 p-3 text-xs font-medium text-red-600 border border-red-100">
-                  <AlertCircle className="h-4 w-4 shrink-0" />
-                  <span>{loginError}</span>
-                </div>
-              )}
+            <div className="relative z-10 mx-auto w-full max-w-sm">
 
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700">รหัสพนักงาน</label>
-                <div className="relative">
-                  <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                  <input 
-                    type="text" 
-                    placeholder="เช่น 12345" 
-                    value={employeeId} 
-                    onChange={(e) => setEmployeeId(e.target.value)} 
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-3 md:py-2.5 pl-10 pr-3 text-xs text-slate-900 outline-none transition focus:border-slate-900 focus:bg-white focus:ring-1 focus:ring-slate-900" 
-                    required 
+              {/* Logo mobile */}
+              <div className="mb-7 flex items-center justify-center md:hidden">
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-blue-100 bg-white p-2 shadow-[0_5px_25px_rgba(80,140,220,0.18)]">
+                  <img
+                    src="/aeroflex-logo.png"
+                    alt="AEROFLEx Logo"
+                    className="h-full w-full object-contain"
                   />
                 </div>
               </div>
 
-              {isLoginAdmin && (
-                <div className="space-y-1 animate-in fade-in slide-in-from-top-2 duration-300">
-                  <label className="text-xs font-semibold text-slate-700">รหัสผ่านแอดมิน</label>
-                  <div className="relative">
-                    <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                    <input 
-                      type="password" 
-                      placeholder="••••••••" 
-                      value={password} 
-                      onChange={(e) => setPassword(e.target.value)} 
-                      className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-3 md:py-2.5 pl-10 pr-3 text-xs text-slate-900 outline-none transition focus:border-slate-900 focus:bg-white focus:ring-1 focus:ring-slate-900" 
-                      required={isLoginAdmin} 
+              <div className="mb-8 text-center md:text-left">
+                <span className="text-[10px] font-bold tracking-[0.2em] text-[#6B94CF]">
+                  WELCOME BACK
+                </span>
+
+                <h2 className="mt-2 text-3xl font-black tracking-tight text-[#243B68]">
+                  เข้าสู่ระบบ
+                </h2>
+
+                <p className="mt-2 text-sm leading-6 text-slate-400">
+                  กรุณากรอกรหัสพนักงานของคุณเพื่อเข้าสู่ระบบ
+                </p>
+              </div>
+
+              <form onSubmit={handleLogin} className="space-y-5">
+
+                {loginError && (
+                  <div className="flex items-center gap-2 rounded-2xl border border-red-100 bg-red-50/90 p-3 text-xs font-medium text-red-600">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <span>{loginError}</span>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-[#405579]">
+                    รหัสพนักงาน
+                  </label>
+
+                  <div className="group relative">
+                    <User className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#91A8CA] transition group-focus-within:text-blue-500" />
+
+                    <input
+                      type="text"
+                      placeholder="เช่น 12345"
+                      value={employeeId}
+                      onChange={(e) => setEmployeeId(e.target.value)}
+                      className="w-full rounded-2xl border border-[#DCE8F8] bg-[#F6F9FF]/90 py-4 pl-12 pr-4 text-sm text-[#263F6D] outline-none transition-all placeholder:text-slate-400 hover:border-blue-200 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100/80"
+                      required
                     />
                   </div>
                 </div>
-              )}
 
-              <button 
-                type="submit" 
-                className="w-full rounded-xl bg-slate-900 py-3.5 md:py-3 text-xs font-bold text-white shadow-md transition hover:bg-slate-800 active:scale-[0.98] disabled:opacity-50 mt-2" 
-                disabled={isLoggingIn}
-              >
-                {isLoggingIn ? 'กำลังตรวจสอบ...' : 'เข้าสู่ระบบ'}
-              </button>
-            </form>
+                {isLoginAdmin && (
+                  <div className="animate-in fade-in slide-in-from-top-2 space-y-2 duration-300">
+                    <label className="text-xs font-bold text-[#405579]">
+                      รหัสผ่านแอดมิน
+                    </label>
 
-            <div className="mt-8 text-center text-[11px] text-slate-400">
-              หากไม่สามารถเข้าสู่ระบบได้ กรุณาติดต่อ <span className="font-semibold text-slate-600">แผนก HR / Admin</span>
+                    <div className="group relative">
+                      <Lock className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#91A8CA] transition group-focus-within:text-blue-500" />
+
+                      <input
+                        type="password"
+                        placeholder="กรอกรหัสผ่าน"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full rounded-2xl border border-[#DCE8F8] bg-[#F6F9FF]/90 py-4 pl-12 pr-4 text-sm text-[#263F6D] outline-none transition-all placeholder:text-slate-400 hover:border-blue-200 focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100/80"
+                        required={isLoginAdmin}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isLoggingIn}
+                  className="group relative mt-3 w-full overflow-hidden rounded-2xl bg-gradient-to-r from-[#356BC1] via-[#4D8BE3] to-[#70A9F5] py-4 text-sm font-bold text-white shadow-[0_8px_24px_rgba(67,126,215,0.30),0_0_18px_rgba(112,169,245,0.20)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_12px_30px_rgba(67,126,215,0.40),0_0_28px_rgba(112,169,245,0.35)] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <span className="relative z-10">
+                    {isLoggingIn ? 'กำลังตรวจสอบ...' : 'เข้าสู่ระบบ'}
+                  </span>
+
+                  <span className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/20 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
+                </button>
+              </form>
+
+              <div className="mt-9 border-t border-blue-50 pt-6 text-center">
+                <p className="text-[11px] leading-6 text-slate-400">
+                  หากไม่สามารถเข้าสู่ระบบได้
+                  <br />
+                  กรุณาติดต่อ
+                  <span className="ml-1 font-bold text-[#5478B0]">
+                    แผนก HR / Admin
+                  </span>
+                </p>
+              </div>
+
+              <div className="mt-6 text-center text-[9px] tracking-[0.16em] text-[#A6B8D3]">
+                AEROFLEX COMPANY LIMITED
+              </div>
             </div>
           </div>
-
         </div>
       </div>
     );
