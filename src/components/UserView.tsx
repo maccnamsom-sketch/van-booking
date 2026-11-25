@@ -475,24 +475,21 @@ export default function UserView({
         <div className="max-w-5xl mx-auto space-y-5 sm:space-y-6">
 
           {/* Welcome Header */}
-          <section className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-[#202B50] via-[#17213F] to-[#0B1020] p-6 sm:p-8 text-white shadow-[8px_8px_24px_rgba(25,38,75,0.18),-8px_-8px_24px_rgba(255,255,255,0.65)]">
+          <section className="relative overflow-hidden rounded-[28px] bg-gradient-to-br from-[#202B50] via-[#17213F] to-[#0B1020] p-5 sm:p-7 text-white shadow-[8px_8px_24px_rgba(25,38,75,0.18),-8px_-8px_24px_rgba(255,255,255,0.65)]">
             <div className="absolute -right-10 -top-14 w-48 h-48 rounded-full bg-white/10" />
             <div className="absolute right-24 -bottom-20 w-44 h-44 rounded-full bg-white/10" />
             <div className="relative z-10 max-w-xl">
-              <span className="inline-flex items-center gap-2 bg-white/15 border border-white/20 rounded-full px-3 py-1.5 text-[11px] font-semibold mb-4">
-                ✨ CENTRAL TRANSPORT HUB
+              <span className="inline-flex items-center gap-2 bg-white/15 border border-white/20 rounded-full px-3 py-1.5 text-[11px] font-semibold mb-3">
+                Aeroflex Van Booking
               </span>
               <p className="text-sky-100 text-sm mb-1">ยินดีต้อนรับ</p>
-              <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-                {displayEmployeeName}
-              </h2>
-              <p className="text-sky-50 text-xs sm:text-sm mt-3 leading-relaxed">
+              <p className="text-sky-50 text-xs sm:text-sm mt-2 leading-relaxed">
                 ระบบจองรถตู้พนักงาน บริษัท แอร์โรเฟลกซ์ จำกัด
                 <br />
                 ตรวจสอบข้อมูลการเดินทางและสำรองที่นั่งได้ที่นี่
               </p>
             </div>
-            <div className="relative z-10 mt-5 flex flex-wrap gap-2">
+            <div className="relative z-10 mt-4 flex flex-wrap gap-2">
               <span className="bg-white/15 border border-white/20 rounded-xl px-3 py-2 text-xs">
                 🕒 ตัดรอบจอง 15:00 น.
               </span>
